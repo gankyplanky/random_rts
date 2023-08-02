@@ -13,6 +13,7 @@ use stopwatch::Stopwatch;
 use std::time::Duration;
 use std::cmp::{max, min};
 
+//Single sprite to render, used in higher abstractions for rendering
 struct Sprite<'s> {
     texture_source: &'s Texture<'s>,
     location: Point,
@@ -42,6 +43,7 @@ impl<'s> Sprite<'s> {
     }
 }
 
+//Represents bindings for player camera
 struct Camera {
     move_up: bool,
     move_down: bool,
@@ -75,6 +77,7 @@ impl Camera {
     }
 }
 
+//Represents current world or map, also used as camera boundary
 struct World<'w> {
     world_texture: &'w Texture<'w>,
     world_sprites: Vec<Vec<Sprite<'w>>>,
@@ -121,28 +124,29 @@ impl<'w> World<'w> {
             while j < self.world_sprites[i].len() {
                 self.world_sprites[i][j].location.x += x_move;
                 self.world_sprites[i][j].location.x = min(
-                    self.world_sprites[i][j].location.x, i as i32 * 50 + 5
+                    self.world_sprites[i][j].location.x,
+                    i as i32 * (self.world_sprites[i][j].width as i32) + 5
                 );
                 self.world_sprites[i][j].location.x = max(
                     self.world_sprites[i][j].location.x,
                     (self.world_sprites.len() as i32 - i as i32 - 1)
-                    * -50 - 5 + window_width 
+                    * -(self.world_sprites[i][j].width as i32) - 5 + window_width 
                 );
 
                 self.world_sprites[i][j].location.y += y_move;
                 self.world_sprites[i][j].location.y = min(
-                    self.world_sprites[i][j].location.y, j as i32 * 50 + 5
+                    self.world_sprites[i][j].location.y,
+                    j as i32 * (self.world_sprites[i][j].height as i32) + 5
                 );
                 self.world_sprites[i][j].location.y = max(
                     self.world_sprites[i][j].location.y,
                     (self.world_sprites[i].len() as i32 - j as i32)
-                    * -50 - 5 + window_height 
+                    * -(self.world_sprites[i][j].height as i32) - 5 + window_height 
                 );
                 j += 1;
             }
             i += 1;
         }
-
     }
 
     fn render(&mut self, canvas: &mut WindowCanvas) {
@@ -163,13 +167,80 @@ struct WorldObject<'o> {
     sprite: Sprite<'o>,
     collider: Rect,
     collider_type: Collidable,
+    top_clamp: Point,
+    bottom_clamp: Point,
 }
 
 enum Collidable {
     GroundCollidable,
     GroundUncollidable,
     AirCollidable,
-    AirUncollidable
+    AirUncollidable,
+    UI
+}
+
+impl<'o> WorldObject<'o> {
+    fn new(texture_source: &'o Texture, collider: Rect, collider_type: Collidable,
+            initial_location: Point, bottom_clamp: Point) -> WorldObject<'o> {
+        let new_object = WorldObject {
+            sprite: {
+                Sprite { 
+                    texture_source, 
+                    location: initial_location, 
+                    texture_loaction: Rect::new(0, 0, 64, 64),
+                    width: 50, 
+                    height: 50, 
+                }
+            },
+            collider,
+            collider_type,
+            top_clamp: initial_location,
+            bottom_clamp
+        };
+
+        return new_object;
+    }
+
+    fn render(&mut self, canvas: &mut WindowCanvas) {
+        self.sprite.render(canvas);
+    }
+}
+
+fn cam_move_world_objects(objects: &mut Vec<&mut WorldObject>, canvas: &mut WindowCanvas,
+        x_move: i32, y_move: i32) {
+    
+    let viewport = canvas.viewport();
+    let mut i: usize = 0;
+    while i < objects.len() {
+        objects[i].sprite.location.x += x_move;
+        objects[i].sprite.location.y += y_move;
+        
+        objects[i].sprite.location.x = min(
+            objects[i].sprite.location.x,
+            objects[i].top_clamp.x + 5
+        );
+        objects[i].sprite.location.y = min(
+            objects[i].sprite.location.y,
+            objects[i].top_clamp.y + 5
+        ); 
+        
+        objects[i].sprite.location.x = max(
+            objects[i].sprite.location.x,
+            -objects[i].bottom_clamp.x + viewport.width() as i32 +
+            objects[i].top_clamp.x + objects[i].sprite.width as i32 - 5
+        );
+        objects[i].sprite.location.y = max(
+            objects[i].sprite.location.y,
+            -objects[i].bottom_clamp.y + objects[i].top_clamp.y +
+            viewport.height() as i32 + objects[i].sprite.height as i32 - 5
+        ); 
+        
+        objects[i].collider = Rect::new(objects[i].sprite.location.x,
+            objects[i].sprite.location.y,
+            objects[i].sprite.width, objects[i].sprite.height);
+        i += 1;
+    }
+    println!("{} {}", objects[0].sprite.location.x, objects[0].sprite.location.x);
 }
 
 fn main() {
@@ -199,6 +270,9 @@ fn main() {
     let none_texture = texture_loader.load_texture("assets/none_sprite.png");
     let ball_texture = texture_loader.load_texture("assets/ball.png");
     
+    //Rendering vectors
+    let mut objects: Vec<&mut WorldObject> = vec![];
+
     //Load Sprites
     let mut game_map = World::new(none_texture.as_ref().unwrap(),
         {
@@ -224,10 +298,25 @@ fn main() {
             new_encode
         });
     
+    let mut test_obj = WorldObject::new(ball_texture.as_ref().unwrap(), 
+        Rect::new(100, 50, 50, 50), Collidable::GroundUncollidable,
+        Point::new(100, 50),
+        Point::new(game_map.world_sprites.len() as i32 * 50,
+            (game_map.world_sprites[0].len() as i32 + 1) * 50)
+    );
     
+    let mut test_obj_1 = WorldObject::new(ball_texture.as_ref().unwrap(), 
+        Rect::new(100, 50, 50, 50), Collidable::GroundUncollidable,
+        Point::new(125, 200),
+        Point::new(game_map.world_sprites.len() as i32 * 50,
+            (game_map.world_sprites[0].len() as i32 + 1) * 50)
+    );
 
     let mut timer = Stopwatch::new();
     timer.start();
+    
+    objects.push(&mut test_obj);
+    objects.push(&mut test_obj_1);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     'main: loop {
@@ -275,7 +364,7 @@ fn main() {
         }
 
         //Logic Processing segment
-        //Camera Movement
+        //Camera Movement - must be done before any other position related calcs
         if player_cam.can_move {
             let mut x_move: i32 = 0;
             let mut y_move: i32 = 0;
@@ -294,6 +383,7 @@ fn main() {
             }
             
             game_map.move_world_cam(window_width as i32, window_height as i32, x_move, y_move);
+            cam_move_world_objects(&mut objects, &mut canvas, x_move, y_move);
         }
         
         if timer.elapsed().as_millis() >= 400 {
@@ -313,10 +403,27 @@ fn main() {
             timer.restart();
         }
 
-        //Rendering segment (order: world -> units/object -> UI)
+        //Rendering segment (order: world -> object -> buildings -> units -> UI)
         //Game world (map)
-        game_map.render(&mut canvas);
+        game_map.render(&mut canvas); 
+        
+        //World objects (decorations, obsticles, cliffs and similar)
+        {
+            let mut i: usize = 0;
+            while i < objects.len() {
+                objects[i].render(&mut canvas);
+                i += 1;
+            }
+        }
     
+        //Buildings (all player or AI made buildings)
+        
+
+        //Units (all units controlled by player or AI)
+    
+    
+        //UI
+
         canvas.present();
 
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 144));
