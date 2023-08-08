@@ -7,6 +7,7 @@ use sdl2::image::{self, InitFlag, LoadTexture};
 use sdl2::pixels::Color;
 use sdl2::rect::{Point, Rect};
 use sdl2::render::{WindowCanvas, Texture};
+use sdl2::mouse::MouseButton;
 
 use stopwatch::Stopwatch;
 
@@ -14,6 +15,7 @@ use std::time::Duration;
 use std::cmp::{max, min};
 
 //Single sprite to render, used in higher abstractions for rendering
+#[derive(Clone, Copy)]
 struct Sprite<'s> {
     texture_source: &'s Texture<'s>,
     location: Point,
@@ -54,11 +56,12 @@ struct Camera {
     down_keycode: Keycode,
     left_keycode: Keycode,
     right_keycode: Keycode,
+    viewport: Rect,
     speed: u32,
 }
 
 impl Camera {
-    fn new(up: Keycode, down: Keycode,
+    fn new(viewport: Rect, up: Keycode, down: Keycode,
             left: Keycode, right: Keycode, speed: u32) -> Camera {
         let new_cam = Camera {
             move_up: false,
@@ -70,6 +73,7 @@ impl Camera {
             down_keycode: down,
             left_keycode: left,
             right_keycode: right,
+            viewport,
             speed,
         };
 
@@ -115,39 +119,6 @@ impl<'w> World<'w> {
             i += 1;
         }
     }
-    
-    fn move_world_cam(&mut self, window_width: i32, window_height: i32,
-                x_move: i32, y_move: i32) {
-        let mut i: usize = 0;
-        while i < self.world_sprites.len() {
-            let mut j: usize = 0;
-            while j < self.world_sprites[i].len() {
-                self.world_sprites[i][j].location.x += x_move;
-                self.world_sprites[i][j].location.x = min(
-                    self.world_sprites[i][j].location.x,
-                    i as i32 * (self.world_sprites[i][j].width as i32) + 5
-                );
-                self.world_sprites[i][j].location.x = max(
-                    self.world_sprites[i][j].location.x,
-                    (self.world_sprites.len() as i32 - i as i32 - 1)
-                    * -(self.world_sprites[i][j].width as i32) - 5 + window_width 
-                );
-
-                self.world_sprites[i][j].location.y += y_move;
-                self.world_sprites[i][j].location.y = min(
-                    self.world_sprites[i][j].location.y,
-                    j as i32 * (self.world_sprites[i][j].height as i32) + 5
-                );
-                self.world_sprites[i][j].location.y = max(
-                    self.world_sprites[i][j].location.y,
-                    (self.world_sprites[i].len() as i32 - j as i32)
-                    * -(self.world_sprites[i][j].height as i32) - 5 + window_height 
-                );
-                j += 1;
-            }
-            i += 1;
-        }
-    }
 
     fn render(&mut self, canvas: &mut WindowCanvas) {
         let mut i: usize = 0;
@@ -176,7 +147,9 @@ enum Collidable {
     GroundUncollidable,
     AirCollidable,
     AirUncollidable,
-    UI
+    AbsoluteCollidable,
+    World,
+    UI,
 }
 
 impl<'o> WorldObject<'o> {
@@ -206,41 +179,131 @@ impl<'o> WorldObject<'o> {
     }
 }
 
-fn cam_move_world_objects(objects: &mut Vec<&mut WorldObject>, canvas: &mut WindowCanvas,
-        x_move: i32, y_move: i32) {
-    
-    let viewport = canvas.viewport();
-    let mut i: usize = 0;
-    while i < objects.len() {
-        objects[i].sprite.location.x += x_move;
-        objects[i].sprite.location.y += y_move;
-        
-        objects[i].sprite.location.x = min(
-            objects[i].sprite.location.x,
-            objects[i].top_clamp.x + 5
-        );
-        objects[i].sprite.location.y = min(
-            objects[i].sprite.location.y,
-            objects[i].top_clamp.y + 5
-        ); 
-        
-        objects[i].sprite.location.x = max(
-            objects[i].sprite.location.x,
-            -objects[i].bottom_clamp.x + viewport.width() as i32 +
-            objects[i].top_clamp.x + objects[i].sprite.width as i32 - 5
-        );
-        objects[i].sprite.location.y = max(
-            objects[i].sprite.location.y,
-            -objects[i].bottom_clamp.y + objects[i].top_clamp.y +
-            viewport.height() as i32 + objects[i].sprite.height as i32 - 5
-        ); 
-        
-        objects[i].collider = Rect::new(objects[i].sprite.location.x,
-            objects[i].sprite.location.y,
-            objects[i].sprite.width, objects[i].sprite.height);
-        i += 1;
+struct Building<'b> {
+    sprite: Sprite<'b>,
+    team: i32,
+    building_type: BuildingType,
+    faction: Faction,
+    collider_type: Collidable,
+    collider: Rect,
+    top_clamp: Point,
+    bottom_clamp: Point,
+}
+
+impl<'b> Building<'b> {
+    fn new(location: Point, building_type: BuildingType, faction: Faction,
+            team: i32, bottom_clamp: Point, texture_source: &'b Texture<'b>) -> Building<'b> {
+        let temp_building_type = building_type.clone();
+        let new_building = Building {
+            team,
+            building_type,
+            faction,
+            top_clamp: location,
+            bottom_clamp,
+            collider_type: Collidable::GroundCollidable,
+            collider: Rect::new(location.x, location.y, 0, 0),
+            sprite: Sprite { 
+                texture_source,
+                location,
+                texture_loaction: {
+                    match temp_building_type {
+                        BuildingType::CommandCentre => {
+                            Rect::new(0, 0, 128, 128)  
+                        },
+                        BuildingType::Barracks => {
+                            Rect::new(0, 0, 64, 64)
+                        },
+                    }
+                },
+                width: { 
+                    match temp_building_type {
+                        BuildingType::CommandCentre => {
+                            100  
+                        },
+                        BuildingType::Barracks => {
+                            50
+                        },
+                    }
+                },
+                height: { 
+                    match temp_building_type {
+                        BuildingType::CommandCentre => {
+                            100  
+                        },
+                        BuildingType::Barracks => {
+                            50
+                        },
+                    }
+                },
+            }
+        };
+
+        return new_building;
     }
-    println!("{} {}", objects[0].sprite.location.x, objects[0].sprite.location.x);
+
+    fn render(&mut self, canvas: &mut WindowCanvas) {
+        self.sprite.render(canvas);
+    } 
+}
+
+#[derive(Clone, Copy)]
+enum BuildingType {
+    CommandCentre,
+    Barracks,
+}
+
+#[derive(Clone, Copy)]
+enum Faction {
+    PlaceholderFaction1,
+}
+
+struct Unit {
+
+}
+
+struct Player<'p> {
+    buildings: Vec<Building<'p>>,
+    units: Vec<Unit>,
+    faction: Faction,
+    top_right_ui: UiElement<'p>,
+}
+
+impl<'p> Player<'p> {
+    fn new(faction: Faction, texture_source: &'p Texture<'p>) -> Player<'p> {
+        let new_p = Player {
+            buildings: vec![],
+            units: vec![],
+            faction,
+            top_right_ui: UiElement::new(Sprite::new(texture_source, Rect::new(0, 0, 64, 64), 
+                Point::new(0, 0), 100, 100)) 
+        };
+
+        return new_p;
+    }
+}
+
+struct UiElement<'u> {
+    sprite: Sprite<'u>,
+    collider_type: Collidable,
+    collider: Rect,
+}
+
+impl<'p> UiElement<'p> {
+    fn new(sprite: Sprite<'p>) -> UiElement<'p> {
+        let temp = sprite.clone();
+        let collider = Rect::new(temp.location.x, temp.location.y, temp.width, temp.height);
+        let new_ui = UiElement {
+            collider_type: Collidable::UI,
+            sprite,
+            collider 
+        };
+
+        return new_ui;
+    }
+
+    fn render(&mut self, canvas: &mut WindowCanvas) {
+        self.sprite.render(canvas);
+    }
 }
 
 fn main() {
@@ -253,12 +316,12 @@ fn main() {
     let window_height = 1080;
 
     let window = video_subsystem.window("Random RTS", window_width, window_height)
-        .position_centered().fullscreen()
+        .fullscreen()
         .build()
         .unwrap();
     
     let mut canvas = window.into_canvas().build().unwrap();
-    let mut player_cam = Camera::new(Keycode::Up, Keycode::Down,
+    let mut player_cam = Camera::new(canvas.viewport(), Keycode::Up, Keycode::Down,
         Keycode::Left, Keycode::Right, 5);
     
     canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -266,12 +329,14 @@ fn main() {
     canvas.present();
 
     //Load Textures
-    let texture_loader = canvas.texture_creator(); 
+    let texture_loader = canvas.texture_creator();
     let none_texture = texture_loader.load_texture("assets/none_sprite.png");
-    let ball_texture = texture_loader.load_texture("assets/ball.png");
-    
-    //Rendering vectors
-    let mut objects: Vec<&mut WorldObject> = vec![];
+    let ball_texture = texture_loader.load_texture("assets/ball.png"); 
+
+    //Rendering vectors:w
+    let mut objects: Vec<WorldObject> = vec![];
+    let mut buildings: Vec<&mut Building> = vec![];
+    let mut units: Vec<&mut Unit> = vec![];
 
     //Load Sprites
     let mut game_map = World::new(none_texture.as_ref().unwrap(),
@@ -298,28 +363,21 @@ fn main() {
             new_encode
         });
     
-    let mut test_obj = WorldObject::new(ball_texture.as_ref().unwrap(), 
-        Rect::new(100, 50, 50, 50), Collidable::GroundUncollidable,
-        Point::new(100, 50),
-        Point::new(game_map.world_sprites.len() as i32 * 50,
-            (game_map.world_sprites[0].len() as i32 + 1) * 50)
-    );
-    
-    let mut test_obj_1 = WorldObject::new(ball_texture.as_ref().unwrap(), 
-        Rect::new(100, 50, 50, 50), Collidable::GroundUncollidable,
-        Point::new(125, 200),
-        Point::new(game_map.world_sprites.len() as i32 * 50,
-            (game_map.world_sprites[0].len() as i32 + 1) * 50)
-    );
+    let mut buffer : Texture = texture_loader.create_texture_target(
+        texture_loader.default_pixel_format(), 
+        game_map.world_sprites.len() as u32 * 50,
+        game_map.world_sprites[0].len() as u32 * 50).unwrap();
 
     let mut timer = Stopwatch::new();
     timer.start();
     
-    objects.push(&mut test_obj);
-    objects.push(&mut test_obj_1);
+    let mut player = Player::new(Faction::PlaceholderFaction1, ball_texture.as_ref().unwrap());
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     'main: loop {
+        //let mut temp_timer = Stopwatch::new();
+        //temp_timer.start();
+        
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
         for event in event_pump.poll_iter() {
@@ -359,6 +417,32 @@ fn main() {
                         player_cam.move_right = false;
                     }
                 },
+                Event::MouseMotion {x, y, .. } => { // Mouse map scrolling
+                    if y >= 0 && y <= 5 {
+                        player_cam.move_up = true;
+                    } else {
+                        player_cam.move_up = false;
+                    }
+                    
+                    if y >= window_height as i32 - 5 && y <= window_height as i32 {
+                        player_cam.move_down = true;
+                    } else {
+                        player_cam.move_down = false;
+                    }
+
+                    if x >= 0 && x <= 5 {
+                        player_cam.move_left = true;
+                    } else {
+                        player_cam.move_left = false;
+                    }
+
+                    if x >= window_width as i32 - 5 && x <= window_width as i32 {
+                        player_cam.move_right = true;
+                    } else {
+                        player_cam.move_right = false;
+                    }
+
+                }
                 _ => {}
             }
         }
@@ -370,20 +454,28 @@ fn main() {
             let mut y_move: i32 = 0;
             
             if player_cam.move_up {
-                y_move += player_cam.speed as i32;
-            }
-            if player_cam.move_down {
                 y_move -= player_cam.speed as i32;
             }
-            if player_cam.move_left {
-                x_move += player_cam.speed as i32;
+            if player_cam.move_down {
+                y_move += player_cam.speed as i32;
             }
-            if player_cam.move_right {
+            if player_cam.move_left {
                 x_move -= player_cam.speed as i32;
             }
+            if player_cam.move_right {
+                x_move += player_cam.speed as i32;
+            }
             
-            game_map.move_world_cam(window_width as i32, window_height as i32, x_move, y_move);
-            cam_move_world_objects(&mut objects, &mut canvas, x_move, y_move);
+            player_cam.viewport.set_x(player_cam.viewport.x + x_move);
+            player_cam.viewport.set_y(player_cam.viewport.y + y_move);
+
+            player_cam.viewport.set_x(max(player_cam.viewport.x, 0));
+            player_cam.viewport.set_y(max(player_cam.viewport.y, 0));
+
+            player_cam.viewport.set_x(min(player_cam.viewport.x,
+                (game_map.world_sprites.len() as i32 - 1) * 50 - window_width as i32 + 10));
+            player_cam.viewport.set_y(min(player_cam.viewport.y, 
+                game_map.world_sprites[0].len() as i32 * 50 - window_height as i32 + 10));
         }
         
         if timer.elapsed().as_millis() >= 400 {
@@ -402,30 +494,42 @@ fn main() {
             }
             timer.restart();
         }
-
+        
         //Rendering segment (order: world -> object -> buildings -> units -> UI)
-        //Game world (map)
-        game_map.render(&mut canvas); 
-        
-        //World objects (decorations, obsticles, cliffs and similar)
-        {
-            let mut i: usize = 0;
-            while i < objects.len() {
-                objects[i].render(&mut canvas);
-                i += 1;
+        let _ = canvas.with_texture_canvas(&mut buffer, |texture_canvas| {
+            //Game world (map)
+            texture_canvas.clear();
+            texture_canvas.set_viewport(Rect::new(5, 5,
+                (game_map.world_sprites.len() + 1) as u32 * 50 + 5,
+                game_map.world_sprites[0].len() as u32 * 50 + 5));
+            game_map.render(texture_canvas);
+            
+            //World objects (decorations, obsticles, cliffs and similar)
+            {
+                let mut i: usize = 0;
+                while i < objects.len() {
+                    objects[i].render(texture_canvas);
+                    i += 1;
+                }
             }
-        }
-    
-        //Buildings (all player or AI made buildings)
+            //Buildings (all player or AI made buildings)
+            
+
+            //Units (all units controlled by player or AI)
         
-
-        //Units (all units controlled by player or AI)
+        
+            //UI
+            /*player.top_right_ui.render(&mut canvas);*/
+        });
+         
     
-    
-        //UI
-
+        canvas.copy(&buffer, player_cam.viewport, canvas.viewport())
+            .expect("buffer coppy error");
         canvas.present();
-
+        
+        /*println!("{}", temp_timer.elapsed().as_nanos());
+        temp_timer.stop();
+        temp_timer.reset();*/
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 144));
     }
 }
