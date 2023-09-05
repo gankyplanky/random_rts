@@ -2,7 +2,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
 use std::cmp::{max, min};
 
-use crate::world::World;
+use super::World;
 
 //Represents bindings for player camera
 pub struct Camera {

@@ -30,6 +30,7 @@ use general::{Collidable, Faction};
 use building::Building;
 use unit::Unit;
 use player::Player;
+use ui::{Button, UiElement};
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -65,7 +66,6 @@ fn main() {
     let mut objects: Vec<WorldObject> = vec![];
     let mut buildings: Vec<&mut Building> = vec![];
     let mut units: Vec<&mut Unit> = vec![];
-    
 
     //Load Sprites
     let mut game_map = World::new(
@@ -102,6 +102,16 @@ fn main() {
             game_map.world_sprites[0][0].height + 100).unwrap();
     
     let mut player = Player::new(Faction::PlaceholderFaction1, ui_texture.as_ref().unwrap());
+    {
+        let temp_func: fn() = ||{
+            println!("clicked");
+        };
+        
+        player.bottom_right_buttons[0] = Some(Button::new(
+            UiElement::new(Sprite::new(ui_texture.as_ref().unwrap(), Rect::new(128, 0, 64, 64),
+               Point::new(1920 - 280 + 30, 1080 - 280 + 25) , 50, 50)),
+            temp_func));
+    }
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     'main: loop {
@@ -126,6 +136,21 @@ fn main() {
                 },
                 Event::MouseMotion {x, y, .. } => { // Mouse map scrolling
                     player_cam.mouse_panning(x, y);
+                }
+                Event::MouseButtonDown { mouse_btn, x, y, .. } => {
+
+                }
+                Event::MouseButtonUp { mouse_btn, x, y, .. } => {
+                    if mouse_btn == MouseButton::Left {
+                        let temp_point = Point::new(x, y);
+                        if player.bottom_right_buttons[0].is_some() {
+                            if player.bottom_right_buttons[0].unwrap().ui.
+                                collider.contains_point(temp_point) {
+                                
+                                player.bottom_right_buttons[0].unwrap().click();
+                            }
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -155,10 +180,21 @@ fn main() {
                 }
             }
             //Buildings (all player or AI made buildings)
-            
-
+            {
+                let mut i: usize = 0;
+                while i < buildings.len() {
+                    buildings[i].render(texture_canvas);
+                    i += 1;
+                }
+            } 
             //Units (all units controlled by player or AI)
-        
+            {
+                let mut i: usize = 0;
+                while i < units.len() {
+                    //units[i].render(texture_canvas);
+                    i += 1;
+                }
+            }
         });
         
         //Copy vieport from buffer
@@ -173,6 +209,6 @@ fn main() {
         //println!("{} ms", temp_timer.elapsed().as_nanos() as f64 / 1_000_000f64);
         //temp_timer.stop();
         //temp_timer.reset();
-        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 144));
+        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 72));
     }
 }

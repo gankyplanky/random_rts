@@ -1,4 +1,5 @@
 
+#[derive(Clone, Copy)]
 pub enum Collidable {
     GroundCollidable,
     GroundUncollidable,
