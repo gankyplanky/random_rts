@@ -102,16 +102,9 @@ fn main() {
             game_map.world_sprites[0][0].height + 100).unwrap();
     
     let mut player = Player::new(Faction::PlaceholderFaction1, ui_texture.as_ref().unwrap());
-    {
-        let temp_func: fn() = ||{
-            println!("clicked");
-        };
-        
-        player.bottom_right_buttons[0] = Some(Button::new(
-            UiElement::new(Sprite::new(ui_texture.as_ref().unwrap(), Rect::new(128, 0, 64, 64),
-               Point::new(1920 - 280 + 30, 1080 - 280 + 25) , 50, 50)),
-            temp_func));
-    }
+
+    //let mut avg: f64 = 0f64;
+    //let mut count: f64 = 0f64;
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     'main: loop {
@@ -143,11 +136,19 @@ fn main() {
                 Event::MouseButtonUp { mouse_btn, x, y, .. } => {
                     if mouse_btn == MouseButton::Left {
                         let temp_point = Point::new(x, y);
-                        if player.bottom_right_buttons[0].is_some() {
-                            if player.bottom_right_buttons[0].unwrap().ui.
-                                collider.contains_point(temp_point) {
-                                
-                                player.bottom_right_buttons[0].unwrap().click();
+                        if player.bottom_right_ui[0].collider.contains_point(temp_point) {    
+                            let mut i: usize = 0;
+                            while i < 16 {
+                                if player.bottom_right_buttons[i].is_some() {
+                                    let temp_button: &mut Button = 
+                                        player.bottom_right_buttons[i].as_mut().unwrap();
+                                    
+                                    if temp_button.ui.collider.contains_point(temp_point) {
+                                        temp_button.click();
+                                    }
+                                }
+
+                                i += 1;
                             }
                         }
                     }
@@ -169,7 +170,7 @@ fn main() {
                     game_map.world_sprites[0][0].width + 50,
                 game_map.world_sprites[0].len() as u32 *
                     game_map.world_sprites[0][0].height + 50));
-            game_map.render(texture_canvas);
+            game_map.render(texture_canvas, player_cam.viewport);
             
             //World objects (decorations, obsticles, cliffs and similar)
             {
@@ -207,8 +208,12 @@ fn main() {
         canvas.present();
         
         //println!("{} ms", temp_timer.elapsed().as_nanos() as f64 / 1_000_000f64);
+        //avg += temp_timer.elapsed().as_nanos() as f64 / 1_000_000f64;
+        //count += 1f64;
         //temp_timer.stop();
         //temp_timer.reset();
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 72));
     }
+
+    //println!("avg: {} ms", avg / count);
 }

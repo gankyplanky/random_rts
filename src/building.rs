@@ -61,6 +61,7 @@ impl<'b> Building<'b> {
                         },
                     }
                 },
+                rect: Rect::new(0, 0, 0, 0)
             }
         };
 

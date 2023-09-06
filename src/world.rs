@@ -47,19 +47,35 @@ impl<'w> World<'w> {
             self.world_sprites.push(temp_sprites);
             i += 1;
         }
+        
+        {
+            let mut i: usize = 0;
+            while i < self.world_sprites.len() {
+                let mut j: usize = 0;
+                while j < self.world_sprites[i].len() {
+                    self.world_sprites[i][j].rect.offset(100, 100);
+                    j += 1;
+                }
+                i += 1;
+            }
+        }
     }
 
-    pub fn render(&mut self, canvas: &mut WindowCanvas) {
+    pub fn render(&mut self, canvas: &mut WindowCanvas, mut viewport: Rect) {
         let mut i: usize = 0;
+        viewport.set_width(viewport.width() + 100);
+        viewport.set_height(viewport.height() + 100);
+
         while i < self.world_sprites.len() {
             let mut j: usize = 0;
             while j < self.world_sprites[i].len() {
-                self.world_sprites[i][j].render(canvas);
+                if viewport.contains_rect(self.world_sprites[i][j].rect) {
+                    self.world_sprites[i][j].render(canvas);
+                }
                 j += 1;
             }
             i += 1;
         }
-        
     }
 }
 
@@ -81,7 +97,8 @@ impl<'o> WorldObject<'o> {
                     location: initial_location, 
                     texture_loaction: Rect::new(0, 0, 64, 64),
                     width: 50, 
-                    height: 50, 
+                    height: 50,
+                    rect: Rect::new(initial_location.x, initial_location.y, 50, 50)
                 }
             },
             collider,

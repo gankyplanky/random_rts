@@ -9,6 +9,7 @@ pub struct Sprite<'s> {
     pub texture_loaction: Rect,
     pub width: u32,
     pub height: u32,
+    pub rect: Rect
 }
 
 impl<'s> Sprite<'s> {
@@ -20,6 +21,7 @@ impl<'s> Sprite<'s> {
             location: initial_location,
             width,
             height,
+            rect: Rect::new(initial_location.x, initial_location.y, width, height)
         };
 
         return new_sprite;
