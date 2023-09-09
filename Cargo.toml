@@ -5,13 +5,23 @@
   authors = ["GenkyDev <genkyplanky@gmail.com>"]  
   build = "build.rs"
 
+[build-dependencies]
+  copy_to_output = "2.1.0"
+
 [dependencies]
   rand = "^0.8"
   rand_core = "^0.6"
-  sdl2-sys = "^0.35"  
   stopwatch = "^0.0.7"
 
-[dependencies.sdl2]
-  version = "^0.35"
+  [dependencies.sdl2]
+  version = "0.35"
   default-features = false
-  features = ["image"]
+  features = ["image","static-link","use-vcpkg"]
+
+  [package.metadata.vcpkg]
+  dependencies = ["sdl2", "sdl2-image[libjpeg-turbo,tiff,libwebp]"]
+  git = "https://github.com/microsoft/vcpkg"
+  branch = "master"
+
+  [package.metadata.vcpkg.target]
+  x86_64-pc-windows-msvc = { triplet = "x64-windows-static-md" }
