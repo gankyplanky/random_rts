@@ -3,6 +3,7 @@
   version = "0.1.0"
   edition = "2021"
   authors = ["GenkyDev <genkyplanky@gmail.com>"]  
+  build = "build.rs"
 
 [dependencies]
   rand = "^0.8"
