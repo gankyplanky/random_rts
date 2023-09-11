@@ -8,7 +8,7 @@ git clone https://github.com/gankyplanky/random_rts.git
 ```
 ### Note:
 You need cargo and rust to build it, [get them here](https://www.rust-lang.org/tools/install).<br>
-As well as git, [here](https://git-scm.com/downloads).<br>
+As well as git, [get it here](https://git-scm.com/downloads).<br>
 
 After, enter the newly created folder and execute the following commands:
 ```
