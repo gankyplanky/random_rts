@@ -27,7 +27,7 @@ impl<'s> Sprite<'s> {
         return new_sprite;
     }
 
-    pub fn render(&mut self, canvas: &mut WindowCanvas) {
+    pub fn render(&self, canvas: &mut WindowCanvas) {
         canvas.copy(self.texture_source, self.texture_loaction,
             Rect::new(self.location.x, self.location.y, self.width, self.height))
             .expect("Failed to render texture");

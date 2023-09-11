@@ -61,7 +61,7 @@ impl<'w> World<'w> {
         }
     }
 
-    pub fn render(&mut self, canvas: &mut WindowCanvas, mut viewport: Rect) {
+    pub fn render(&self, canvas: &mut WindowCanvas, mut viewport: Rect) {
         let mut i: usize = 0;
         viewport.set_width(viewport.width() + 100);
         viewport.set_height(viewport.height() + 100);
@@ -110,7 +110,7 @@ impl<'o> WorldObject<'o> {
         return new_object;
     }
 
-    pub fn render(&mut self, canvas: &mut WindowCanvas) {
+    pub fn render(&self, canvas: &mut WindowCanvas) {
         self.sprite.render(canvas);
     }
 }

@@ -3,6 +3,7 @@ use sdl2::rect::{Point, Rect};
 
 use super::{Sprite, Building, Faction, Unit, ui::{UiElement, Button}};
 
+#[derive(Clone)]
 pub struct Player<'p> {
     pub buildings: Vec<Building<'p>>,
     pub units: Vec<Unit>,
@@ -44,7 +45,7 @@ impl<'p> Player<'p> {
         return new_p;
     }
 
-    pub fn render_ui(&mut self, canvas: &mut WindowCanvas) {
+    pub fn render_ui(&self, canvas: &mut WindowCanvas) {
         let mut i: usize = 0;
         while i < self.bottom_right_ui.len() {
             self.bottom_right_ui[i].render(canvas);

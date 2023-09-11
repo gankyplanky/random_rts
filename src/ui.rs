@@ -23,7 +23,7 @@ impl<'p> UiElement<'p> {
         return new_ui;
     }
 
-    pub fn render(&mut self, canvas: &mut WindowCanvas) {
+    pub fn render(&self, canvas: &mut WindowCanvas) {
         self.sprite.render(canvas);
     }
 }
@@ -44,7 +44,7 @@ impl<'b> Button<'b> {
         return new_button;
     }
 
-    pub fn render(&mut self, canvas: &mut WindowCanvas) {
+    pub fn render(&self, canvas: &mut WindowCanvas) {
         self.ui.render(canvas);
     }
 

@@ -27,7 +27,7 @@ use sprite::Sprite;
 use camera::Camera;
 use world::{World, WorldObject};
 use general::{Collidable, Faction};
-use building::Building;
+use building::{Building, BuildingType};
 use unit::Unit;
 use player::Player;
 use ui::{Button, UiElement};
@@ -61,11 +61,12 @@ fn main() {
     let grass_texture = texture_loader.load_texture("assets/ground/ground_grass.png");
     let dirt_texture = texture_loader.load_texture("assets/ground/ground_dirt.png");
     let ui_texture = texture_loader.load_texture("assets/UI/bottom_left_ui_placeholder.png");
+    let buttons_texture = texture_loader.load_texture("assets/UI/buttons_placeholders.png");
+    let cc_temp_texture = texture_loader.load_texture("assets/buildings/placeholder_fc1_CC.png");
 
     //Rendering vectors
     let mut objects: Vec<WorldObject> = vec![];
-    let mut buildings: Vec<&mut Building> = vec![];
-    let mut units: Vec<&mut Unit> = vec![];
+    let mut players: Vec<Player> = vec![];
 
     //Load Sprites
     let mut game_map = World::new(
@@ -101,7 +102,15 @@ fn main() {
         game_map.world_sprites[0].len() as u32 *
             game_map.world_sprites[0][0].height + 100).unwrap();
     
-    let mut player = Player::new(Faction::PlaceholderFaction1, ui_texture.as_ref().unwrap());
+    players.push(Player::new(Faction::PlaceholderFaction1, ui_texture.as_ref().unwrap()));
+    
+    {
+        let temp = players[0].to_owned();
+
+        players[0].buildings.push(Building::new(Point::new(50, 50), BuildingType::CommandCentre,
+            Faction::PlaceholderFaction1, 0, cc_temp_texture.as_ref().unwrap(),
+            buttons_texture.as_ref().unwrap(), &temp));
+    }
 
     //let mut avg: f64 = 0f64;
     //let mut count: f64 = 0f64;
@@ -136,15 +145,12 @@ fn main() {
                 Event::MouseButtonUp { mouse_btn, x, y, .. } => {
                     if mouse_btn == MouseButton::Left {
                         let temp_point = Point::new(x, y);
-                        if player.bottom_right_ui[0].collider.contains_point(temp_point) {    
+                        if players[0].bottom_right_ui[0].collider.contains_point(temp_point) {    
                             let mut i: usize = 0;
                             while i < 16 {
-                                if player.bottom_right_buttons[i].is_some() {
-                                    let temp_button: &mut Button = 
-                                        player.bottom_right_buttons[i].as_mut().unwrap();
-                                    
-                                    if temp_button.ui.collider.contains_point(temp_point) {
-                                        temp_button.click();
+                                if players[0].bottom_right_buttons[i].is_some() {
+                                    if players[0].bottom_right_buttons[i].unwrap().ui.collider.contains_point(temp_point) {
+                                        players[0].bottom_right_buttons[i].unwrap().click();
                                     }
                                 }
 
@@ -160,50 +166,49 @@ fn main() {
         //Logic Processing segment
         //Camera Movement - must be done before any other position related calcs
         player_cam.move_cam(&game_map);
-
-        //Rendering segment (order: world -> object -> buildings -> units -> UI)
-        let _ = canvas.with_texture_canvas(&mut buffer, |texture_canvas| {
-            //Game world (map)
-            texture_canvas.clear();
-            texture_canvas.set_viewport(Rect::new(45, 45,
-                (game_map.world_sprites.len() + 1) as u32 *
-                    game_map.world_sprites[0][0].width + 50,
-                game_map.world_sprites[0].len() as u32 *
-                    game_map.world_sprites[0][0].height + 50));
-            game_map.render(texture_canvas, player_cam.viewport);
-            
-            //World objects (decorations, obsticles, cliffs and similar)
-            {
-                let mut i: usize = 0;
-                while i < objects.len() {
-                    objects[i].render(texture_canvas);
-                    i += 1;
-                }
-            }
-            //Buildings (all player or AI made buildings)
-            {
-                let mut i: usize = 0;
-                while i < buildings.len() {
-                    buildings[i].render(texture_canvas);
-                    i += 1;
-                }
-            } 
-            //Units (all units controlled by player or AI)
-            {
-                let mut i: usize = 0;
-                while i < units.len() {
-                    //units[i].render(texture_canvas);
-                    i += 1;
-                }
-            }
-        });
         
-        //Copy vieport from buffer
-        canvas.copy(&buffer, player_cam.viewport, canvas.viewport())
-            .expect("buffer coppy error");
+        {//Rendering segment (order: world -> objects -> buildings/units -> UI)
+            let temp_players = players.to_owned();
+
+            let _ = canvas.with_texture_canvas(&mut buffer, |texture_canvas| {
+                //Game world (map)
+                texture_canvas.clear();
+                texture_canvas.set_viewport(Rect::new(45, 45,
+                    (game_map.world_sprites.len() + 1) as u32 *
+                        game_map.world_sprites[0][0].width + 50,
+                    game_map.world_sprites[0].len() as u32 *
+                        game_map.world_sprites[0][0].height + 50));
+                game_map.render(texture_canvas, player_cam.viewport);
+                
+                //World objects (decorations, obsticles, cliffs and similar)
+                {
+                    let mut i: usize = 0;
+                    while i < objects.len() {
+                        objects[i].render(texture_canvas);
+                        i += 1;
+                    }
+                }
+                //Buildings/Units (all player or AI made buildings and units)
+                {
+                    for player in temp_players {
+                        for building in player.buildings {
+                            building.render(texture_canvas);
+                        }
+
+                        for unit in player.units {
+                            //unit.render(texture_canvas);
+                        }
+                    }
+                } 
+            });
+            
+            //Copy vieport from buffer
+            canvas.copy(&buffer, player_cam.viewport, canvas.viewport())
+                .expect("buffer coppy error");
+        }
 
         //UI
-        player.render_ui(&mut canvas);
+        players[0].render_ui(&mut canvas);
 
         canvas.present();
         
