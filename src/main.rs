@@ -89,8 +89,13 @@ fn main() {
 
             new_encode[1][1] = 1;
             new_encode[1][2] = 1;
+            new_encode[1][3] = 1;
             new_encode[2][1] = 1;
             new_encode[2][2] = 1;
+            new_encode[2][3] = 1;
+            new_encode[3][1] = 1;
+            new_encode[3][2] = 1;
+            new_encode[3][3] = 1;
 
             new_encode
         });
@@ -136,8 +141,8 @@ fn main() {
                 Event::KeyUp { keycode, .. } => { // Key released
                     player_cam.check_up_key(keycode.unwrap());
                 },
-                Event::MouseMotion {x, y, .. } => { // Mouse map scrolling
-                    player_cam.mouse_panning(x, y);
+                Event::MouseMotion {x, y, .. } => { // Mouse moved
+                    player_cam.mouse_panning(x, y); // Mouse map scrolling
                 }
                 Event::MouseButtonDown { mouse_btn, x, y, .. } => {
 
@@ -145,17 +150,34 @@ fn main() {
                 Event::MouseButtonUp { mouse_btn, x, y, .. } => {
                     if mouse_btn == MouseButton::Left {
                         let temp_point = Point::new(x, y);
+                        let mut interacted = false;
                         if players[0].bottom_right_ui[0].collider.contains_point(temp_point) {    
                             let mut i: usize = 0;
                             while i < 16 {
-                                if players[0].bottom_right_buttons[i].is_some() {
-                                    if players[0].bottom_right_buttons[i].unwrap().ui.collider.contains_point(temp_point) {
-                                        players[0].bottom_right_buttons[i].unwrap().click();
-                                    }
+                                if players[0].check_button(temp_point, i) {
+                                    interacted = true;
+                                    break;
                                 }
-
                                 i += 1;
                             }
+                        }
+
+                        if !interacted {
+                            let mut i: usize = 0;
+                            while i < players[0].buildings.len() {
+                                if players[0].buildings[i].sprite.
+                                        rect.contains_point(temp_point) {
+                                    players[0].select_building(i);
+                                    interacted = true;
+                                    break;
+                                }
+                                i += 1;
+                            }
+                        }
+
+                        if !interacted && !players[0].bottom_right_ui[0].collider
+                                .contains_point(temp_point){
+                            players[0].deselect();
                         }
                     }
                 }
@@ -164,9 +186,9 @@ fn main() {
         }
 
         //Logic Processing segment
-        //Camera Movement - must be done before any other position related calcs
+        //Camera Movement 
         player_cam.move_cam(&game_map);
-        
+           
         {//Rendering segment (order: world -> objects -> buildings/units -> UI)
             let temp_players = players.to_owned();
 
@@ -198,6 +220,7 @@ fn main() {
                         for unit in player.units {
                             //unit.render(texture_canvas);
                         }
+                        
                     }
                 } 
             });

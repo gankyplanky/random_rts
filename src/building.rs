@@ -50,7 +50,7 @@ impl<'b> Building<'b> {
                 width: { 
                     match temp_building_type {
                         BuildingType::CommandCentre => {
-                            100  
+                            150  
                         },
                         BuildingType::Barracks => {
                             50
@@ -60,7 +60,7 @@ impl<'b> Building<'b> {
                 height: { 
                     match temp_building_type {
                         BuildingType::CommandCentre => {
-                            100  
+                            150  
                         },
                         BuildingType::Barracks => {
                             50
@@ -77,7 +77,7 @@ impl<'b> Building<'b> {
 
         return new_building;
     }
-    
+
     fn init_buttons<'a>(building: &mut Building<'b>, button_texture: &'b Texture<'b>, owner: &'a Player<'a>) {
         match building.faction {
             Faction::PlaceholderFaction1 => {
