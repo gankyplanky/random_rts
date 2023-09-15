@@ -95,7 +95,7 @@ impl<'o> WorldObject<'o> {
                 Sprite { 
                     texture_source, 
                     location: initial_location, 
-                    texture_loaction: Rect::new(0, 0, 64, 64),
+                    texture_location: Rect::new(0, 0, 64, 64),
                     width: 50, 
                     height: 50,
                     rect: Rect::new(initial_location.x, initial_location.y, 50, 50)

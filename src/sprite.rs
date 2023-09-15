@@ -6,18 +6,18 @@ use sdl2::render::{Texture, WindowCanvas};
 pub struct Sprite<'s> {
     pub texture_source: &'s Texture<'s>,
     pub location: Point,
-    pub texture_loaction: Rect,
+    pub texture_location: Rect,
     pub width: u32,
     pub height: u32,
     pub rect: Rect
 }
 
 impl<'s> Sprite<'s> {
-    pub fn new(texture_source: &'s Texture, texture_loaction: Rect, 
+    pub fn new(texture_source: &'s Texture, texture_location: Rect, 
             initial_location: Point, width: u32, height: u32) -> Sprite<'s> {
         let new_sprite = Sprite {
             texture_source,
-            texture_loaction,
+            texture_location,
             location: initial_location,
             width,
             height,
@@ -28,7 +28,7 @@ impl<'s> Sprite<'s> {
     }
 
     pub fn render(&self, canvas: &mut WindowCanvas) {
-        canvas.copy(self.texture_source, self.texture_loaction,
+        canvas.copy(self.texture_source, self.texture_location,
             Rect::new(self.location.x, self.location.y, self.width, self.height))
             .expect("Failed to render texture");
     }

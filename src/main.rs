@@ -27,7 +27,7 @@ use sprite::Sprite;
 use camera::Camera;
 use world::{World, WorldObject};
 use general::{Collidable, Faction};
-use building::{Building, BuildingType};
+use building::{Building, BuildingType, BuildingStatus};
 use unit::Unit;
 use player::Player;
 use ui::{Button, UiElement};
@@ -114,7 +114,9 @@ fn main() {
 
         players[0].buildings.push(Building::new(Point::new(50, 50), BuildingType::CommandCentre,
             Faction::PlaceholderFaction1, 0, cc_temp_texture.as_ref().unwrap(),
-            buttons_texture.as_ref().unwrap(), &temp));
+            buttons_texture.as_ref().unwrap(), temp.bottom_right_ui.to_owned()));
+
+        players[0].buildings[0].status = BuildingStatus::Built;
     }
 
     //let mut avg: f64 = 0f64;
@@ -151,6 +153,9 @@ fn main() {
                     if mouse_btn == MouseButton::Left {
                         let temp_point = Point::new(x, y);
                         let mut interacted = false;
+
+                        //if players[0].placing_building
+
                         if players[0].bottom_right_ui[0].collider.contains_point(temp_point) {    
                             let mut i: usize = 0;
                             while i < 16 {
@@ -188,8 +193,23 @@ fn main() {
         //Logic Processing segment
         //Camera Movement 
         player_cam.move_cam(&game_map);
-           
-        {//Rendering segment (order: world -> objects -> buildings/units -> UI)
+        
+        {
+            let mut i: usize = 0;
+            while i < players[0].buildings.len() {
+                if players[0].buildings[i].constructing.is_some() {
+                    if players[0].buildings[i].construction_done() {
+                        let temp_building = players[0].buildings[i].get_constructed().to_owned();
+                        players[0].buildings.push(temp_building.unwrap().to_owned());
+                        players[0].buildings[i].constructing = None;
+                    }
+                }
+                i += 1;
+            }
+        } 
+
+        //Rendering segment (order: world -> objects -> buildings/units -> UI)
+        {
             let temp_players = players.to_owned();
 
             let _ = canvas.with_texture_canvas(&mut buffer, |texture_canvas| {
@@ -213,7 +233,7 @@ fn main() {
                 //Buildings/Units (all player or AI made buildings and units)
                 {
                     for player in temp_players {
-                        for building in player.buildings {
+                        for mut building in player.buildings {
                             building.render(texture_canvas);
                         }
 

@@ -12,6 +12,7 @@ pub struct Player<'p> {
     pub bottom_right_ui: Vec<UiElement<'p>>,
     pub selected_building: Option<usize>,
     pub selected_unit: Option<usize>,
+    pub placing_building: bool,
 }
 
 impl<'p> Player<'p> {
@@ -22,6 +23,7 @@ impl<'p> Player<'p> {
             faction,
             selected_unit: None,
             selected_building: None,
+            placing_building: false,
             top_right_ui: UiElement::new(Sprite::new(texture_source, Rect::new(0, 0, 64, 64), 
                 Point::new(5, 5), 100, 100)),
             bottom_right_ui: vec![ // Bottom right UI containter
@@ -68,15 +70,21 @@ impl<'p> Player<'p> {
         if self.selected_building.is_some() {
             self.selected_building = None;
         }
+
+        self.placing_building = false;
     }
     
-    pub fn check_button<'f>(&'f self, point: Point, index: usize) -> bool {
+    pub fn check_button<'f>(&'f mut self, point: Point, index: usize) -> bool {
         if self.selected_building.is_some() {
             let buttons = self.get_building_buttons();
 
             if buttons[index].is_some() {
                 if buttons[index].unwrap().ui.collider.contains_point(point) {
-                    buttons[index].unwrap().click();
+                    let temp_player_clone = self.to_owned();
+                    let temp_btn_fnc = buttons[index].unwrap().btn_function.to_owned();
+                    let temp_building: &mut Building = &mut self.
+                        buildings[self.selected_building.unwrap().to_owned()];
+                    temp_building.execute_fn(temp_btn_fnc, temp_player_clone); 
                     return true;
                 }  
             }

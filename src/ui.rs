@@ -1,7 +1,7 @@
 use sdl2::render::WindowCanvas;
 use sdl2::rect::Rect;
 
-use super::{Sprite, Collidable};
+use super::{Sprite, Collidable, Building};
 
 #[derive(Clone, Copy)]
 pub struct UiElement<'u> {
@@ -31,14 +31,14 @@ impl<'p> UiElement<'p> {
 #[derive(Clone, Copy)]
 pub struct Button<'b> {
     pub ui: UiElement<'b>,
-    pub click_func: fn()
+    pub btn_function: ButtonFunction, 
 }
 
 impl<'b> Button<'b> {
-    pub fn new(ui_elem: UiElement<'b>, click_func: fn()) -> Button<'b> {
+    pub fn new(ui_elem: UiElement<'b>, btn_function: ButtonFunction) -> Button<'b> {
         let new_button = Button {
             ui: ui_elem,
-            click_func
+            btn_function
         };
 
         return new_button;
@@ -47,8 +47,13 @@ impl<'b> Button<'b> {
     pub fn render(&self, canvas: &mut WindowCanvas) {
         self.ui.render(canvas);
     }
+}
 
-    pub fn click(&mut self) {
-        (self.click_func)();
-    }
+#[derive(Clone, Copy)]
+pub enum ButtonFunction {
+    ShowTier1Buildings,
+    ShowTier2Buildings,
+    MakeWorker,
+    Back,
+    MakeBarracks,
 }
