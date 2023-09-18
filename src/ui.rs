@@ -49,11 +49,15 @@ impl<'b> Button<'b> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ButtonFunction {
     ShowTier1Buildings,
     ShowTier2Buildings,
     MakeWorker,
     Back,
     MakeBarracks,
+    MakeCC,
+    PlaceConstruction,
+    PlaceBarracks,
+    PlaceCommandCentre,
 }

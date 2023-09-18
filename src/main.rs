@@ -107,7 +107,8 @@ fn main() {
         game_map.world_sprites[0].len() as u32 *
             game_map.world_sprites[0][0].height + 100).unwrap();
     
-    players.push(Player::new(Faction::PlaceholderFaction1, ui_texture.as_ref().unwrap()));
+    players.push(Player::new(Faction::PlaceholderFaction1, ui_texture.as_ref().unwrap(), 
+        buttons_texture.as_ref().unwrap()));
     
     {
         let temp = players[0].to_owned();
@@ -145,6 +146,12 @@ fn main() {
                 },
                 Event::MouseMotion {x, y, .. } => { // Mouse moved
                     player_cam.mouse_panning(x, y); // Mouse map scrolling
+
+                    let mouse_cam_point = Point::new(x, y);
+                    if players[0].placing_building {
+                        let index = players[0].selected_building.unwrap().to_owned();
+                        players[0].buildings[index].move_building(mouse_cam_point, player_cam.viewport);
+                    }
                 }
                 Event::MouseButtonDown { mouse_btn, x, y, .. } => {
 
@@ -153,8 +160,6 @@ fn main() {
                     if mouse_btn == MouseButton::Left {
                         let temp_point = Point::new(x, y);
                         let mut interacted = false;
-
-                        //if players[0].placing_building
 
                         if players[0].bottom_right_ui[0].collider.contains_point(temp_point) {    
                             let mut i: usize = 0;
@@ -165,6 +170,11 @@ fn main() {
                                 }
                                 i += 1;
                             }
+                        } else if players[0].placing_building {
+                            let index = players[0].selected_building.unwrap().to_owned();
+                            players[0].buildings[index].status = BuildingStatus::Built;
+                            players[0].deselect();
+                            interacted = true;
                         }
 
                         if !interacted {

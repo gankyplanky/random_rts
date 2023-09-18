@@ -1,4 +1,4 @@
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Collidable {
     GroundCollidable,
     GroundUncollidable,
@@ -9,7 +9,7 @@ pub enum Collidable {
     UI,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Faction {
     PlaceholderFaction1,
 }

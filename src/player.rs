@@ -1,6 +1,9 @@
 use sdl2::render::{WindowCanvas, Texture};
 use sdl2::rect::{Point, Rect};
 
+use crate::building::{BuildingType, BuildingStatus};
+use crate::ui::ButtonFunction;
+
 use super::{Sprite, Building, Faction, Unit, ui::{UiElement, Button}};
 
 #[derive(Clone)]
@@ -13,16 +16,19 @@ pub struct Player<'p> {
     pub selected_building: Option<usize>,
     pub selected_unit: Option<usize>,
     pub placing_building: bool,
+    pub construction_buttons: [Option<Button<'p>>; 16], 
 }
 
 impl<'p> Player<'p> {
-    pub fn new(faction: Faction, texture_source: &'p Texture<'p>) -> Player<'p> {
+    pub fn new(faction: Faction, texture_source: &'p Texture<'p>,
+            button_texture: &'p Texture<'p>) -> Player<'p> {
         let mut new_p = Player {
             buildings: vec![],
             units: vec![],
             faction,
             selected_unit: None,
             selected_building: None,
+            construction_buttons: [None; 16],
             placing_building: false,
             top_right_ui: UiElement::new(Sprite::new(texture_source, Rect::new(0, 0, 64, 64), 
                 Point::new(5, 5), 100, 100)),
@@ -32,29 +38,60 @@ impl<'p> Player<'p> {
             ],
         };
         
-        let mut i: i32 = 0;
-        while i < 4 {
-            let mut j: i32 = 0; // Bottom right button panels
-            while j < 4 {
-                new_p.bottom_right_ui.push( 
-                    UiElement::new(Sprite::new(texture_source, Rect::new(64, 0, 64, 64), 
-                        Point::new(1920 - 280 + 30 + j * 60, 1080 - 280 + 25 + i * 60),
-                        50, 50) ),
-                );
-                j += 1;
+        {
+            let mut i: i32 = 0;
+            while i < 4 {
+                let mut j: i32 = 0; // Bottom right button panels
+                while j < 4 {
+                    new_p.bottom_right_ui.push( 
+                        UiElement::new(Sprite::new(texture_source, Rect::new(64, 0, 64, 64), 
+                            Point::new(1920 - 280 + 30 + j * 60, 1080 - 280 + 25 + i * 60),
+                            50, 50) ),
+                    );
+                    j += 1;
+                }
+                i += 1;
             }
-            i += 1;
         }
 
+        new_p.construction_buttons[0] = Some(Button::new(UiElement::new(
+            Sprite::new(button_texture, Rect::new(2 * 64, 0, 64, 64), 
+                Point::new(new_p.bottom_right_ui[1].sprite.location.x, 
+                    new_p.bottom_right_ui[1].sprite.location.y),
+                50, 50)
+            ),
+            crate::ui::ButtonFunction::PlaceCommandCentre
+        ));
+        new_p.construction_buttons[15] = Some(Button::new(UiElement::new(
+            Sprite::new(button_texture, Rect::new(4 * 64, 0, 64, 64), 
+                Point::new(new_p.bottom_right_ui[16].sprite.location.x, 
+                    new_p.bottom_right_ui[16].sprite.location.y),
+                50, 50)
+            ),
+            crate::ui::ButtonFunction::Back
+        ));
+        
         return new_p;
     }
-    
+
     fn get_building_buttons<'f>(&'f self) -> &'p [Option<Button>; 16] {
         let temp_buttons_panel_index = self.buildings[self.selected_building.unwrap()]
             .button_panel_index.to_owned();
         let buttons: &[Option<Button>; 16] = &self.buildings[self.selected_building.unwrap()]
             .buttons[temp_buttons_panel_index];
         return buttons; 
+    }
+    
+    pub fn check_place_construction_flag<'f>(&'f self) -> bool {
+        let mut i: usize = 0;
+        while i < self.buildings.len() {
+            if self.buildings[i].place_construction_flag {
+                return true;
+            }
+
+            i += 1;
+        }
+        return false;
     }
 
     pub fn select_building<'f>(&'f mut self, index: usize) {
@@ -68,6 +105,9 @@ impl<'p> Player<'p> {
         }
 
         if self.selected_building.is_some() {
+            let index = self.selected_building.unwrap().to_owned();
+            self.buildings[index].button_panel_index = 0;
+            self.buildings[index].place_construction_flag = false;
             self.selected_building = None;
         }
 
@@ -75,7 +115,15 @@ impl<'p> Player<'p> {
     }
     
     pub fn check_button<'f>(&'f mut self, point: Point, index: usize) -> bool {
-        if self.selected_building.is_some() {
+        if self.check_place_construction_flag() {
+            if self.construction_buttons[index].is_some() {
+                if self.construction_buttons[index].unwrap().ui.collider.contains_point(point) {
+                    let temp_btn_fn = self.construction_buttons[index]
+                        .unwrap().to_owned().btn_function;
+                    self.place_building(temp_btn_fn);
+                }
+            }
+        } else if self.selected_building.is_some() {
             let buttons = self.get_building_buttons();
 
             if buttons[index].is_some() {
@@ -92,6 +140,44 @@ impl<'p> Player<'p> {
 
         return false;
     } 
+    
+    pub fn place_building<'f>(&'f mut self, action_type: ButtonFunction) {
+        let building_type: BuildingType;
+        match action_type {
+            ButtonFunction::PlaceBarracks => {
+                building_type = BuildingType::Barracks;
+            },
+            ButtonFunction::PlaceCommandCentre => {
+                building_type = BuildingType::CommandCentre;
+            },
+            ButtonFunction::Back => {
+                self.deselect();
+                return;
+            },
+            _ => { 
+                println!("------Error when selecting building type for placement!!");
+                self.deselect();
+                return;
+            }
+        }
+
+        {
+            let mut i: usize = 0;
+            while i < self.buildings.len() {
+                if self.buildings[i].status == BuildingStatus::NotBuilt {
+                    if self.buildings[i].building_type == building_type {
+                        self.deselect();
+                        self.selected_building = Some(i);
+                        self.buildings[i].status = BuildingStatus::Placing;
+                        self.placing_building = true;
+                        break;
+                    }
+                }       
+
+                i += 1;
+            }
+        }
+    }
 
     pub fn render_ui<'f>(&'f self, canvas: &'f mut WindowCanvas) {
         let mut i: usize = 0;
@@ -100,7 +186,15 @@ impl<'p> Player<'p> {
             i += 1;
         }
         
-        if self.selected_building.is_some() {
+        if self.check_place_construction_flag() {
+            i = 0;
+            while i < self.construction_buttons.len() {
+                if self.construction_buttons[i].is_some() {
+                    self.construction_buttons[i].unwrap().render(canvas);
+                }
+                i += 1;
+            }
+        } else if self.selected_building.is_some() {
             let buttons = self.get_building_buttons();
             i = 0;
             while i < buttons.len() {
