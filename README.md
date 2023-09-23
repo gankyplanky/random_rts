@@ -16,4 +16,4 @@ cargo install cargo-vcpkg
 cargo vcpkg build
 cargo build --release
 ```
-Then navigate to 'target/release/' and execute random_rts.exe, while in the game press ESC to quit.
+Then navigate to 'target/release/' and execute random_rts.exe, while in the game press ESC to exit.
