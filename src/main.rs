@@ -62,7 +62,8 @@ fn main() {
     let dirt_texture = texture_loader.load_texture("assets/ground/ground_dirt.png");
     let ui_texture = texture_loader.load_texture("assets/UI/bottom_left_ui_placeholder.png");
     let buttons_texture = texture_loader.load_texture("assets/UI/buttons_placeholders.png");
-    let cc_temp_texture = texture_loader.load_texture("assets/buildings/placeholder_fc1_CC.png");
+    let buildings_texture = texture_loader.load_texture("assets/buildings/placeholder_buildings.png");
+    let grid_texture = texture_loader.load_texture("assets/ground/grid.png");
 
     //Rendering vectors
     let mut objects: Vec<WorldObject> = vec![];
@@ -98,7 +99,9 @@ fn main() {
             new_encode[3][3] = 1;
 
             new_encode
-        });
+        },
+        grid_texture.as_ref().unwrap()
+    );
     
     let mut buffer : Texture = texture_loader.create_texture_target(
         texture_loader.default_pixel_format(), 
@@ -114,10 +117,11 @@ fn main() {
         let temp = players[0].to_owned();
 
         players[0].buildings.push(Building::new(Point::new(50, 50), BuildingType::CommandCentre,
-            Faction::PlaceholderFaction1, 0, cc_temp_texture.as_ref().unwrap(),
+            Faction::PlaceholderFaction1, 0, buildings_texture.as_ref().unwrap(),
             buttons_texture.as_ref().unwrap(), temp.bottom_right_ui.to_owned()));
-
-        players[0].buildings[0].status = BuildingStatus::Built;
+        
+        players[0].selected_building = Some(0);
+        players[0].place_building(&mut game_map);
     }
 
     //let mut avg: f64 = 0f64;
@@ -130,6 +134,8 @@ fn main() {
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
+        
+        
 
         for event in event_pump.poll_iter() {
             match event {
@@ -148,9 +154,12 @@ fn main() {
                     player_cam.mouse_panning(x, y); // Mouse map scrolling
 
                     let mouse_cam_point = Point::new(x, y);
-                    if players[0].placing_building {
+                    if players[0].placing_building { // Move building ghost
+                        players[0].dehighlight(&mut game_map);
                         let index = players[0].selected_building.unwrap().to_owned();
-                        players[0].buildings[index].move_building(mouse_cam_point, player_cam.viewport);
+                        players[0].buildings[index].move_building(mouse_cam_point,
+                            player_cam.viewport, &mut game_map.grid);
+                        players[0].buildings[index].highlight_cells(&mut game_map);
                     }
                 }
                 Event::MouseButtonDown { mouse_btn, x, y, .. } => {
@@ -160,7 +169,8 @@ fn main() {
                     if mouse_btn == MouseButton::Left {
                         let temp_point = Point::new(x, y);
                         let mut interacted = false;
-
+                        
+                        //Check button clicks
                         if players[0].bottom_right_ui[0].collider.contains_point(temp_point) {    
                             let mut i: usize = 0;
                             while i < 16 {
@@ -170,14 +180,12 @@ fn main() {
                                 }
                                 i += 1;
                             }
-                        } else if players[0].placing_building {
-                            let index = players[0].selected_building.unwrap().to_owned();
-                            players[0].buildings[index].status = BuildingStatus::Built;
-                            players[0].deselect();
+                        } else if players[0].placing_building {//Place newly constructed building
+                            players[0].place_building(&mut game_map);
                             interacted = true;
                         }
 
-                        if !interacted {
+                        if !interacted {// Select a building
                             let mut i: usize = 0;
                             while i < players[0].buildings.len() {
                                 if players[0].buildings[i].sprite.
@@ -190,7 +198,7 @@ fn main() {
                             }
                         }
 
-                        if !interacted && !players[0].bottom_right_ui[0].collider
+                        if !interacted && !players[0].bottom_right_ui[0].collider // Deselect
                                 .contains_point(temp_point){
                             players[0].deselect();
                         }
@@ -204,7 +212,7 @@ fn main() {
         //Camera Movement 
         player_cam.move_cam(&game_map);
         
-        {
+        { //Checks for completed constructions
             let mut i: usize = 0;
             while i < players[0].buildings.len() {
                 if players[0].buildings[i].constructing.is_some() {
@@ -230,7 +238,8 @@ fn main() {
                         game_map.world_sprites[0][0].width + 50,
                     game_map.world_sprites[0].len() as u32 *
                         game_map.world_sprites[0][0].height + 50));
-                game_map.render(texture_canvas, player_cam.viewport);
+                game_map.render(texture_canvas, player_cam.viewport,
+                    players[0].placing_building);
                 
                 //World objects (decorations, obsticles, cliffs and similar)
                 {
