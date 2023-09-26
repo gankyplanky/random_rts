@@ -4,6 +4,7 @@ use std::cmp::{max, min};
 use sdl2::rect::{Point, Rect};
 use sdl2::render::{WindowCanvas, Texture};
 
+use crate::general::Selectable;
 use crate::world::{World, Cell};
 
 use super::sprite::Sprite;
@@ -32,7 +33,7 @@ impl<'b> Building<'b> {
     pub fn new<'a>(location: Point, building_type: BuildingType, faction: Faction,
             team: i32, texture_source: &'b Texture<'b>,
             button_texture: &'b Texture<'b>,
-             bottom_right_ui: Vec<UiElement<'a>>) -> Building<'b> {
+             bottom_right_ui: Vec<UiElement<'b>>) -> Building<'b> {
         let temp_building_type = building_type.clone();
         let mut new_building = Building {
             team,
@@ -92,7 +93,7 @@ impl<'b> Building<'b> {
     }
 
     fn init_buttons<'a>(building: &mut Building<'b>, button_texture: &'b Texture<'b>,
-            bottom_right_ui: Vec<UiElement<'a>>) {
+            bottom_right_ui: Vec<UiElement<'b>>) {
         match building.faction {
             Faction::PlaceholderFaction1 => {
                 match building.building_type {
@@ -102,69 +103,33 @@ impl<'b> Building<'b> {
                         building.buttons.push([None; 16]);
                         building.buttons.push([None; 16]);
 
-                        building.buttons[0][0] = Some(Button::new(UiElement::new(
-                            Sprite::new(button_texture, Rect::new(
-                                    general::SHOW_TIER1_BUILDINGS_INDEX * 64, 0, 64, 64), 
-                                Point::new(bottom_right_ui[1].sprite.location.x, 
-                                    bottom_right_ui[1].sprite.location.y),
-                                50, 50)
-                            ),
-                            crate::ui::ButtonFunction::ShowTier1Buildings
-                        ));
-                        building.buttons[0][1] = Some(Button::new(UiElement::new(
-                            Sprite::new(button_texture, Rect::new(
-                                    general::SHOW_TIER2_BUILDINGS_INDEX * 64, 0, 64, 64), 
-                                Point::new(bottom_right_ui[2].sprite.location.x, 
-                                    bottom_right_ui[2].sprite.location.y),
-                                50, 50)
-                            ),
-                            crate::ui::ButtonFunction::ShowTier2Buildings
-                        ));
-                        building.buttons[0][15] = Some(Button::new(UiElement::new(
-                            Sprite::new(button_texture, Rect::new(
-                                    general::PLACE_CONSTRUCTIN_INDEX * 64, 0, 64, 64), 
-                                Point::new(bottom_right_ui[16].sprite.location.x, 
-                                    bottom_right_ui[16].sprite.location.y),
-                                50, 50)
-                            ),
-                            crate::ui::ButtonFunction::PlaceConstruction
-                        ));
-                        building.buttons[1][0] = Some(Button::new(UiElement::new(
-                            Sprite::new(button_texture, Rect::new(
-                                    general::COMMAND_CENTRE_INDEX * 64, 0, 64, 64), 
-                                Point::new(bottom_right_ui[1].sprite.location.x, 
-                                    bottom_right_ui[1].sprite.location.y),
-                                50, 50)
-                            ),
-                            crate::ui::ButtonFunction::MakeCC
-                        ));
-                        building.buttons[1][1] = Some(Button::new(UiElement::new(
-                            Sprite::new(button_texture, Rect::new(
-                                    general::BARRACKS_INDEX * 64, 0, 64, 64), 
-                                Point::new(bottom_right_ui[2].sprite.location.x, 
-                                    bottom_right_ui[2].sprite.location.y),
-                                50, 50)
-                            ),
-                            crate::ui::ButtonFunction::MakeBarracks
-                        ));
-                        building.buttons[1][15] = Some(Button::new(UiElement::new(
-                            Sprite::new(button_texture, Rect::new(
-                                    general::BACK_INDEX * 64, 0, 64, 64), 
-                                Point::new(bottom_right_ui[16].sprite.location.x, 
-                                    bottom_right_ui[16].sprite.location.y),
-                                50, 50)
-                            ),
-                            crate::ui::ButtonFunction::Back
-                        ));
-                        building.buttons[2][15] = Some(Button::new(UiElement::new(
-                            Sprite::new(button_texture, Rect::new(
-                                    general::BACK_INDEX * 64, 0, 64, 64), 
-                                Point::new(bottom_right_ui[16].sprite.location.x, 
-                                    bottom_right_ui[16].sprite.location.y),
-                                50, 50)
-                            ),
-                            crate::ui::ButtonFunction::Back
-                        ));
+                        building.buttons[0][0] = general::gen_button(button_texture,
+                            general::SHOW_TIER1_BUILDINGS_INDEX, 0, bottom_right_ui.to_owned(),
+                            ButtonFunction::ShowTier1Buildings);
+
+                        building.buttons[0][1] = general::gen_button(button_texture,
+                            general::SHOW_TIER2_BUILDINGS_INDEX, 1, bottom_right_ui.to_owned(),
+                            ButtonFunction::ShowTier2Buildings);
+
+                        building.buttons[0][15] = general::gen_button(button_texture,
+                            general::PLACE_CONSTRUCTIN_INDEX, 15, bottom_right_ui.to_owned(),
+                            ButtonFunction::PlaceConstruction);
+                        
+                        building.buttons[1][0] = general::gen_button(button_texture,
+                            general::COMMAND_CENTRE_INDEX, 0, bottom_right_ui.to_owned(),
+                            ButtonFunction::MakeCC);
+
+                        building.buttons[1][1] = general::gen_button(button_texture,
+                            general::BARRACKS_INDEX, 1, bottom_right_ui.to_owned(),
+                            ButtonFunction::MakeBarracks);
+
+                        building.buttons[1][15] = general::gen_button(button_texture,
+                            general::BACK_INDEX, 15, bottom_right_ui.to_owned(),
+                            ButtonFunction::Back);
+
+                        building.buttons[2][15] = general::gen_button(button_texture,
+                            general::BACK_INDEX, 15, bottom_right_ui.to_owned(),
+                            ButtonFunction::Back);
                     },
                     BuildingType::Barracks => {
                         building.button_panel_limit = 1;
@@ -174,10 +139,6 @@ impl<'b> Building<'b> {
                 }
             }
         } 
-    }
-    
-    pub fn num_of_cells<'f>(&'f self) -> i32 {
-        (self.collider.w * self.collider.h) / 25
     }
 
     pub fn width_in_cells<'f>(&'f self) -> i32 {
@@ -340,6 +301,16 @@ impl<'b> Building<'b> {
             BuildingStatus::NotBuilt => {}
         }
     } 
+}
+
+impl<'b> Selectable for Building<'b> {
+    fn get_selection<'f>(&'f self, index: usize) -> general::Selection {
+        general::Selection::Building(index)
+    }
+
+    fn get_buttons<'f>(&'f self) -> &[Option<Button>; 16] {
+        &self.buttons[self.button_panel_index]
+    }
 }
 
 #[derive(Clone)]

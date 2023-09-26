@@ -26,7 +26,7 @@ use std::cmp::{max, min};
 use sprite::Sprite;
 use camera::Camera;
 use world::{World, WorldObject};
-use general::{Collidable, Faction};
+use general::{Collidable, Faction, Selection, Selectable};
 use building::{Building, BuildingType, BuildingStatus};
 use unit::Unit;
 use player::Player;
@@ -49,10 +49,6 @@ fn main() {
     let mut canvas = window.into_canvas().build().unwrap();
     let mut player_cam = Camera::new(canvas.viewport(), Keycode::Up, Keycode::Down,
         Keycode::Left, Keycode::Right, 15);
-    
-    canvas.set_draw_color(Color::RGB(0, 0, 0));
-    canvas.clear();
-    canvas.present();
 
     //Load Textures
     let texture_loader = canvas.texture_creator();
@@ -120,7 +116,7 @@ fn main() {
             Faction::PlaceholderFaction1, 0, buildings_texture.as_ref().unwrap(),
             buttons_texture.as_ref().unwrap(), temp.bottom_right_ui.to_owned()));
         
-        players[0].selected_building = Some(0);
+        players[0].selected = Selection::Building(0);
         players[0].place_building(&mut game_map);
     }
 
@@ -134,8 +130,9 @@ fn main() {
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-        
-        
+
+        player_cam.viewport.set_width(canvas.window().size().0);
+        player_cam.viewport.set_height(canvas.window().size().1);
 
         for event in event_pump.poll_iter() {
             match event {
@@ -156,7 +153,7 @@ fn main() {
                     let mouse_cam_point = Point::new(x, y);
                     if players[0].placing_building { // Move building ghost
                         players[0].dehighlight(&mut game_map);
-                        let index = players[0].selected_building.unwrap().to_owned();
+                        let index = players[0].selected.index();
                         players[0].buildings[index].move_building(mouse_cam_point,
                             player_cam.viewport, &mut game_map.grid);
                         players[0].buildings[index].highlight_cells(&mut game_map);
@@ -185,17 +182,8 @@ fn main() {
                             interacted = true;
                         }
 
-                        if !interacted {// Select a building
-                            let mut i: usize = 0;
-                            while i < players[0].buildings.len() {
-                                if players[0].buildings[i].sprite.
-                                        rect.contains_point(temp_point) {
-                                    players[0].select_building(i);
-                                    interacted = true;
-                                    break;
-                                }
-                                i += 1;
-                            }
+                        if !interacted {// Select a building / unit
+                            interacted = players[0].try_selecting(temp_point);
                         }
 
                         if !interacted && !players[0].bottom_right_ui[0].collider // Deselect
@@ -256,9 +244,9 @@ fn main() {
                             building.render(texture_canvas);
                         }
 
-                        for unit in player.units {
-                            //unit.render(texture_canvas);
-                        }
+                        /*for unit in player.units {
+                            unit.render(texture_canvas);
+                        }*/
                         
                     }
                 } 

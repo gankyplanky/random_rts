@@ -39,7 +39,7 @@ impl Camera {
         return new_cam;
     }
     
-    pub fn check_up_key(&mut self, up_key: Keycode) {
+    pub fn check_up_key<'f>(&'f mut self, up_key: Keycode) {
         if up_key == self.up_keycode {
             self.move_up = false;
         }
@@ -54,7 +54,7 @@ impl Camera {
         }
     }
 
-    pub fn check_down_key(&mut self, down_key: Keycode) {
+    pub fn check_down_key<'f>(&'f mut self, down_key: Keycode) {
         if down_key == self.up_keycode {
             self.move_up = true;
         }
@@ -69,7 +69,7 @@ impl Camera {
         }
     }
 
-    pub fn mouse_panning(&mut self, x: i32, y: i32) {
+    pub fn mouse_panning<'f>(&'f mut self, x: i32, y: i32) {
         if y >= 0 && y <= 5 {
             self.move_up = true;
         } else {
@@ -95,7 +95,7 @@ impl Camera {
         }
     }
 
-    pub fn move_cam(&mut self, game_map: &World) {
+    pub fn move_cam<'f>(&'f mut self, game_map: &'f World) {
         if self.can_move {
             let mut x_move: i32 = 0;
             let mut y_move: i32 = 0;

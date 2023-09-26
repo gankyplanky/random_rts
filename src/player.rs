@@ -2,11 +2,12 @@ use sdl2::render::{WindowCanvas, Texture};
 use sdl2::rect::{Point, Rect};
 
 use crate::building::{BuildingType, BuildingStatus};
+use crate::general::Selectable;
 use crate::ui::ButtonFunction;
 use crate::world::World;
 
 use super::{Sprite, Building, Faction, Unit, ui::{UiElement, Button}};
-use super::general;
+use super::general::{self, Selection};
 
 #[derive(Clone)]
 pub struct Player<'p> {
@@ -15,8 +16,7 @@ pub struct Player<'p> {
     pub faction: Faction,
     pub top_right_ui: UiElement<'p>,
     pub bottom_right_ui: Vec<UiElement<'p>>,
-    pub selected_building: Option<usize>,
-    pub selected_unit: Option<usize>,
+    pub selected: Selection,
     pub placing_building: bool,
     pub construction_buttons: [Option<Button<'p>>; 16], 
 }
@@ -29,8 +29,7 @@ impl<'p> Player<'p> {
             buildings: vec![],
             units: vec![],
             faction,
-            selected_unit: None,
-            selected_building: None,
+            selected: Selection::None,
             construction_buttons: [None; 16],
             placing_building: false,
             top_right_ui: UiElement::new(Sprite::new(texture_source, Rect::new(0, 0, 64, 64), 
@@ -57,48 +56,25 @@ impl<'p> Player<'p> {
             }
         }
 
-        new_p.construction_buttons[0] = Some(Button::new(UiElement::new(
-            Sprite::new(button_texture, Rect::new(
-                    general::COMMAND_CENTRE_INDEX * 64, 0, 64, 64), 
-                Point::new(new_p.bottom_right_ui[1].sprite.location.x, 
-                    new_p.bottom_right_ui[1].sprite.location.y),
-                50, 50)
-            ),
-            crate::ui::ButtonFunction::PlaceCommandCentre
-        ));
-        new_p.construction_buttons[1] = Some(Button::new(UiElement::new(
-            Sprite::new(button_texture, Rect::new(
-                    general::BARRACKS_INDEX * 64, 0, 64, 64), 
-                Point::new(new_p.bottom_right_ui[2].sprite.location.x, 
-                    new_p.bottom_right_ui[2].sprite.location.y),
-                50, 50)
-            ),
-            crate::ui::ButtonFunction::PlaceBarracks
-        ));
-        new_p.construction_buttons[15] = Some(Button::new(UiElement::new(
-            Sprite::new(button_texture, Rect::new(
-                    general::BACK_INDEX * 64, 0, 64, 64), 
-                Point::new(new_p.bottom_right_ui[16].sprite.location.x, 
-                    new_p.bottom_right_ui[16].sprite.location.y),
-                50, 50)
-            ),
-            crate::ui::ButtonFunction::Back
-        ));
+        new_p.construction_buttons[0] = general::gen_button(button_texture,
+            general::COMMAND_CENTRE_INDEX, 0, new_p.bottom_right_ui.to_owned(),
+            ButtonFunction::PlaceCommandCentre);
+        
+        new_p.construction_buttons[1] = general::gen_button(button_texture,
+            general::BARRACKS_INDEX, 1, new_p.bottom_right_ui.to_owned(),
+            ButtonFunction::PlaceBarracks);
+        
+        new_p.construction_buttons[15] = general::gen_button(button_texture,
+            general::BACK_INDEX, 15, new_p.bottom_right_ui.to_owned(),
+            ButtonFunction::Back);
         
         return new_p;
     }
     
     //Building Interactions
-    fn get_building_buttons<'f>(&'f self) -> &'p [Option<Button>; 16] {
-        let temp_buttons_panel_index = self.buildings[self.selected_building.unwrap()]
-            .button_panel_index.to_owned();
-        let buttons: &[Option<Button>; 16] = &self.buildings[self.selected_building.unwrap()]
-            .buttons[temp_buttons_panel_index];
-        return buttons; 
-    }
     
     pub fn place_building<'f>(&'f mut self, game_map: &'f mut World) {
-        let index = self.selected_building.unwrap().to_owned();
+        let index = self.selected.index();
         let cell_x = self.buildings[index].x_in_cells();
         let cell_y = self.buildings[index].y_in_cells();
         let w_cells = self.buildings[index].width_in_cells();
@@ -163,7 +139,7 @@ impl<'p> Player<'p> {
                 if self.buildings[i].status == BuildingStatus::NotBuilt {
                     if self.buildings[i].building_type == building_type {
                         self.deselect();
-                        self.selected_building = Some(i);
+                        self.selected = Selection::Building(i);
                         self.buildings[i].status = BuildingStatus::Placing;
                         self.placing_building = true;
                         break;
@@ -188,28 +164,73 @@ impl<'p> Player<'p> {
     }
     
     //General
-    pub fn select_building<'f>(&'f mut self, index: usize) {
-        self.selected_unit = None;
-        self.selected_building = Some(index);
+    fn get_buttons<'f>(&'f self) -> Option<&'p [Option<Button>; 16]> {
+        let mut buttons: Option<&[Option<Button>; 16]> = None;
+
+        if self.selected.is_building() {
+            buttons = Some(self.buildings[self.selected.index()].get_buttons());
+        } /*else if self.selected.is_unit() {
+            buttons = self.units[self.selected.index()].get_buttons();
+        } */
+
+        return buttons; 
     }
     
+    fn get_selectables<'f>(&'f self) -> Vec<Selection> {
+        let mut selectables: Vec<Selection> = vec![];
+        let mut i: usize = 0;
+        while i < self.buildings.len() {
+            selectables.push(self.buildings[i].get_selection(i));
+            i += 1;
+        }
+        /*i = 0;
+        while i < self.units.len() {
+            selectables.push(self.units[i].get_selection(i));
+            i += 1;
+        }*/
+        selectables
+    }
+    
+    fn check_selecting_click<'f>(&'f self, selection: Selection, click: Point) -> bool {
+        match selection {
+            Selection::Building(index) => {
+                self.buildings[index].collider.contains_point(click)
+            },
+            /*Selection::Unit(index) => {
+                self.units[index].collider.contains_point(click)
+            },*/
+            _ => { false }
+        }
+    }
+    
+    pub fn try_selecting<'f>(&'f mut self, click: Point) -> bool {
+        for selectable in self.get_selectables() {
+            if self.check_selecting_click(selectable, click) {
+                self.selected = selectable;
+                return true;
+            }
+        }
+
+        false
+    }
+
     pub fn dehighlight<'f>(&'f mut self, game_map: &'f mut World) {
-        if self.selected_building.is_some() {
-            let index = self.selected_building.unwrap().to_owned();
+        if self.selected.is_building() {
+            let index = self.selected.index();
             self.buildings[index].dehighlight_cells(game_map);
         }
     }
 
     pub fn deselect<'f>(&'f mut self) {
-        if self.selected_unit.is_some() {
-            self.selected_unit = None;
+        if self.selected.is_unit() {
+            self.selected = Selection::None;
         }
 
-        if self.selected_building.is_some() {
-            let index = self.selected_building.unwrap().to_owned();
+        if self.selected.is_building() {
+            let index = self.selected.index();
             self.buildings[index].button_panel_index = 0;
             self.buildings[index].place_construction_flag = false;
-            self.selected_building = None;
+            self.selected = Selection::None;
         }
 
         self.placing_building = false;
@@ -224,15 +245,15 @@ impl<'p> Player<'p> {
                     self.start_placing_building(temp_btn_fn);
                 }
             }
-        } else if self.selected_building.is_some() {
-            let buttons = self.get_building_buttons();
+        } else if self.selected.is_building() {
+            let buttons = self.get_buttons().unwrap();
 
             if buttons[index].is_some() {
                 if buttons[index].unwrap().ui.collider.contains_point(point) {
                     let temp_player_clone = self.to_owned();
                     let temp_btn_fnc = buttons[index].unwrap().btn_function.to_owned();
                     let temp_building: &mut Building = &mut self.
-                        buildings[self.selected_building.unwrap().to_owned()];
+                        buildings[self.selected.index()];
                     temp_building.execute_fn(temp_btn_fnc, temp_player_clone); 
                     return true;
                 }  
@@ -258,8 +279,8 @@ impl<'p> Player<'p> {
                 }
                 i += 1;
             }
-        } else if self.selected_building.is_some() {
-            let buttons = self.get_building_buttons();
+        } else if self.selected.is_some() {
+            let buttons = self.get_buttons().unwrap();
             i = 0;
             while i < buttons.len() {
                 if buttons[i].is_some() {
