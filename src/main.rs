@@ -12,25 +12,23 @@ mod world;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::image::{self, InitFlag, LoadTexture};
-use sdl2::pixels::Color;
+use sdl2::image::{self, InitFlag};
+use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::{Point, Rect};
-use sdl2::render::{WindowCanvas, Texture};
+use sdl2::render::Texture;
 use sdl2::mouse::MouseButton;
 
 use stopwatch::Stopwatch;
 
 use std::time::Duration;
-use std::cmp::{max, min}; 
 
-use sprite::Sprite;
+use sprite::{Sprite, TextureManager};
 use camera::Camera;
 use world::{World, WorldObject};
-use general::{Collidable, Faction, Selection, Selectable};
-use building::{Building, BuildingType, BuildingStatus};
+use general::{Collidable, Faction, Selection};
+use building::{Building, BuildingType};
 use unit::Unit;
 use player::Player;
-use ui::{Button, UiElement};
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -45,21 +43,16 @@ fn main() {
         .fullscreen()
         .build()
         .unwrap();
-    
+
     let mut canvas = window.into_canvas().build().unwrap();
+    let texture_loader = canvas.texture_creator();
+    
+    //Load texture atlas and create player cam
+    let mut atlas = TextureManager::new(&texture_loader);
+    atlas.update(&mut canvas);
+
     let mut player_cam = Camera::new(canvas.viewport(), Keycode::Up, Keycode::Down,
         Keycode::Left, Keycode::Right, 15);
-
-    //Load Textures
-    let texture_loader = canvas.texture_creator();
-    let none_texture = texture_loader.load_texture("assets/none_sprite.png");
-    let ball_texture = texture_loader.load_texture("assets/ball.png");
-    let grass_texture = texture_loader.load_texture("assets/ground/ground_grass.png");
-    let dirt_texture = texture_loader.load_texture("assets/ground/ground_dirt.png");
-    let ui_texture = texture_loader.load_texture("assets/UI/bottom_left_ui_placeholder.png");
-    let buttons_texture = texture_loader.load_texture("assets/UI/buttons_placeholders.png");
-    let buildings_texture = texture_loader.load_texture("assets/buildings/placeholder_buildings.png");
-    let grid_texture = texture_loader.load_texture("assets/ground/grid.png");
 
     //Rendering vectors
     let mut objects: Vec<WorldObject> = vec![];
@@ -67,8 +60,6 @@ fn main() {
 
     //Load Sprites
     let mut game_map = World::new(
-        vec![grass_texture.as_ref().unwrap(), 
-            dirt_texture.as_ref().unwrap()],
         {
             let mut new_encode: Vec<Vec<i32>> = vec![vec![]];
             {
@@ -77,44 +68,48 @@ fn main() {
                     let mut j: usize = 0;
                     new_encode.push(vec![]);
                     while j < 75 {
-                        new_encode[i].push(0);
+                        new_encode[i].push(1);
                         j += 1;
                     }
                     i += 1;
                 }
             }
 
-            new_encode[1][1] = 1;
-            new_encode[1][2] = 1;
-            new_encode[1][3] = 1;
-            new_encode[2][1] = 1;
-            new_encode[2][2] = 1;
-            new_encode[2][3] = 1;
-            new_encode[3][1] = 1;
-            new_encode[3][2] = 1;
-            new_encode[3][3] = 1;
+            new_encode[1][1] = 2;
+            new_encode[1][2] = 2;
+            new_encode[1][3] = 2;
+            new_encode[2][1] = 2;
+            new_encode[2][2] = 2;
+            new_encode[2][3] = 2;
+            new_encode[3][1] = 2;
+            new_encode[3][2] = 2;
+            new_encode[3][3] = 2;
 
             new_encode
         },
-        grid_texture.as_ref().unwrap()
+        &atlas
     );
-    
-    let mut buffer : Texture = texture_loader.create_texture_target(
-        texture_loader.default_pixel_format(), 
+      
+    let mut buffer: Texture = texture_loader.create_texture_target(
+        PixelFormatEnum::ARGB32, 
         game_map.world_sprites.len() as u32 * 
-            game_map.world_sprites[0][0].width + 100,
+            game_map.world_sprites[0][0].loc_rect.w as u32 + 100,
         game_map.world_sprites[0].len() as u32 *
-            game_map.world_sprites[0][0].height + 100).unwrap();
+            game_map.world_sprites[0][0].loc_rect.h as u32 + 100).unwrap();
     
-    players.push(Player::new(Faction::PlaceholderFaction1, ui_texture.as_ref().unwrap(), 
-        buttons_texture.as_ref().unwrap()));
+    buffer.set_blend_mode(sdl2::render::BlendMode::Blend);
+    buffer.set_alpha_mod(255);
+    
+    canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
+    canvas.set_draw_color(Color::RGBA(0, 0, 0, 0));
+
+    players.push(Player::new(Faction::PlaceholderFaction1, player_cam.viewport, &atlas));
     
     {
         let temp = players[0].to_owned();
 
         players[0].buildings.push(Building::new(Point::new(50, 50), BuildingType::CommandCentre,
-            Faction::PlaceholderFaction1, 0, buildings_texture.as_ref().unwrap(),
-            buttons_texture.as_ref().unwrap(), temp.bottom_right_ui.to_owned()));
+            Faction::PlaceholderFaction1, 0, temp.bottom_right_ui.to_owned(), &atlas));
         
         players[0].selected = Selection::Building(0);
         players[0].place_building(&mut game_map);
@@ -127,8 +122,6 @@ fn main() {
     'main: loop {
         //let mut temp_timer = Stopwatch::new();
         //temp_timer.start();
-
-        canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
 
         player_cam.viewport.set_width(canvas.window().size().0);
@@ -205,7 +198,8 @@ fn main() {
             while i < players[0].buildings.len() {
                 if players[0].buildings[i].constructing.is_some() {
                     if players[0].buildings[i].construction_done() {
-                        let temp_building = players[0].buildings[i].get_constructed().to_owned();
+                        let temp_building = players[0].buildings[i].get_constructed(&atlas)
+                            .to_owned();
                         players[0].buildings.push(temp_building.unwrap().to_owned());
                         players[0].buildings[i].constructing = None;
                     }
@@ -223,17 +217,17 @@ fn main() {
                 texture_canvas.clear();
                 texture_canvas.set_viewport(Rect::new(45, 45,
                     (game_map.world_sprites.len() + 1) as u32 *
-                        game_map.world_sprites[0][0].width + 50,
+                        game_map.world_sprites[0][0].loc_rect.w as u32 + 50,
                     game_map.world_sprites[0].len() as u32 *
-                        game_map.world_sprites[0][0].height + 50));
+                        game_map.world_sprites[0][0].loc_rect.h as u32 + 50));
                 game_map.render(texture_canvas, player_cam.viewport,
-                    players[0].placing_building);
+                    players[0].placing_building, &atlas);
                 
                 //World objects (decorations, obsticles, cliffs and similar)
                 {
                     let mut i: usize = 0;
                     while i < objects.len() {
-                        objects[i].render(texture_canvas);
+                        objects[i].render(texture_canvas, &atlas);
                         i += 1;
                     }
                 }
@@ -241,7 +235,7 @@ fn main() {
                 {
                     for player in temp_players {
                         for mut building in player.buildings {
-                            building.render(texture_canvas);
+                            building.render(texture_canvas, &atlas);
                         }
 
                         /*for unit in player.units {
@@ -251,14 +245,14 @@ fn main() {
                     }
                 } 
             });
-            
+
             //Copy vieport from buffer
             canvas.copy(&buffer, player_cam.viewport, canvas.viewport())
                 .expect("buffer coppy error");
         }
 
         //UI
-        players[0].render_ui(&mut canvas);
+        players[0].render_ui(&mut canvas, &atlas);
 
         canvas.present();
         

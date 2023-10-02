@@ -121,12 +121,12 @@ impl Camera {
 
             self.viewport.set_x(min(self.viewport.x,
                 (game_map.world_sprites.len() as i32 - 1) * 
-                    game_map.world_sprites[0][0].width as i32 - 
+                    game_map.world_sprites[0][0].loc_rect.w as i32 - 
                         self.viewport.width() as i32 + 55));
             
             self.viewport.set_y(min(self.viewport.y, 
                 game_map.world_sprites[0].len() as i32 * 
-                    game_map.world_sprites[0][0].height as i32 - 
+                    game_map.world_sprites[0][0].loc_rect.h as i32 - 
                         self.viewport.height() as i32 + 55));
         }
 

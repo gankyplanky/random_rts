@@ -1,8 +1,9 @@
-use sdl2::render::{WindowCanvas, Texture};
+use sdl2::render::WindowCanvas;
 use sdl2::rect::{Point, Rect};
 
 use crate::building::{BuildingType, BuildingStatus};
 use crate::general::Selectable;
+use crate::sprite::{TextureManager, TextureType};
 use crate::ui::ButtonFunction;
 use crate::world::World;
 
@@ -10,21 +11,19 @@ use super::{Sprite, Building, Faction, Unit, ui::{UiElement, Button}};
 use super::general::{self, Selection};
 
 #[derive(Clone)]
-pub struct Player<'p> {
-    pub buildings: Vec<Building<'p>>,
+pub struct Player {
+    pub buildings: Vec<Building>,
     pub units: Vec<Unit>,
     pub faction: Faction,
-    pub top_right_ui: UiElement<'p>,
-    pub bottom_right_ui: Vec<UiElement<'p>>,
+    pub bottom_right_ui: Vec<UiElement>,
     pub selected: Selection,
     pub placing_building: bool,
-    pub construction_buttons: [Option<Button<'p>>; 16], 
+    pub construction_buttons: [Option<Button>; 16], 
 }
 
-impl<'p> Player<'p> {
+impl Player {
     // New Player
-    pub fn new(faction: Faction, texture_source: &'p Texture<'p>,
-            button_texture: &'p Texture<'p>) -> Player<'p> {
+    pub fn new<'f>(faction: Faction, viewport: Rect, atlas: &'f TextureManager) -> Player {
         let mut new_p = Player {
             buildings: vec![],
             units: vec![],
@@ -32,41 +31,38 @@ impl<'p> Player<'p> {
             selected: Selection::None,
             construction_buttons: [None; 16],
             placing_building: false,
-            top_right_ui: UiElement::new(Sprite::new(texture_source, Rect::new(0, 0, 64, 64), 
-                Point::new(5, 5), 100, 100)),
-            bottom_right_ui: vec![ // Bottom right UI containter
-                UiElement::new(Sprite::new(texture_source, Rect::new(0, 0, 64, 64), 
-                    Point::new(1920 - 280, 1080 - 280), 280, 280) ),
-            ],
+            bottom_right_ui: vec![UiElement::new(Sprite::new(
+                Rect::new(viewport.w - 280, viewport.h - 280, 280, 280),
+                TextureType::UI { type_index: 1 }, 
+                atlas), 0)], // Bottom right UI container
         };
         
-        {
+        { // Bottom right button panels
             let mut i: i32 = 0;
             while i < 4 {
-                let mut j: i32 = 0; // Bottom right button panels
+                let mut j: i32 = 0; 
                 while j < 4 {
                     new_p.bottom_right_ui.push( 
-                        UiElement::new(Sprite::new(texture_source, Rect::new(64, 0, 64, 64), 
-                            Point::new(1920 - 280 + 30 + j * 60, 1080 - 280 + 25 + i * 60),
-                            50, 50) ),
-                    );
+                        UiElement::new(Sprite::new(
+                            Rect::new(
+                                new_p.bottom_right_ui[0].collider.x + j * 60 + 30,
+                                new_p.bottom_right_ui[0].collider.y + i * 60 + 30,
+                                50, 50), 
+                            TextureType::UI { type_index: 1 }, 
+                            atlas ),
+                        1));
                     j += 1;
                 }
                 i += 1;
             }
         }
 
-        new_p.construction_buttons[0] = general::gen_button(button_texture,
-            general::COMMAND_CENTRE_INDEX, 0, new_p.bottom_right_ui.to_owned(),
-            ButtonFunction::PlaceCommandCentre);
-        
-        new_p.construction_buttons[1] = general::gen_button(button_texture,
-            general::BARRACKS_INDEX, 1, new_p.bottom_right_ui.to_owned(),
-            ButtonFunction::PlaceBarracks);
-        
-        new_p.construction_buttons[15] = general::gen_button(button_texture,
-            general::BACK_INDEX, 15, new_p.bottom_right_ui.to_owned(),
-            ButtonFunction::Back);
+        new_p.construction_buttons[0] = general::gen_button(atlas,
+            new_p.bottom_right_ui.to_owned(), ButtonFunction::PlaceCommandCentre, 0);
+        new_p.construction_buttons[1] = general::gen_button(atlas,
+            new_p.bottom_right_ui.to_owned(), ButtonFunction::PlaceBarracks, 1);
+        new_p.construction_buttons[15] = general::gen_button(atlas,
+            new_p.bottom_right_ui.to_owned(), ButtonFunction::Back, 15);
         
         return new_p;
     }
@@ -164,14 +160,14 @@ impl<'p> Player<'p> {
     }
     
     //General
-    fn get_buttons<'f>(&'f self) -> Option<&'p [Option<Button>; 16]> {
+    fn get_buttons<'f>(&'f self) -> Option<&[Option<Button>; 16]> {
         let mut buttons: Option<&[Option<Button>; 16]> = None;
 
         if self.selected.is_building() {
             buttons = Some(self.buildings[self.selected.index()].get_buttons());
-        } /*else if self.selected.is_unit() {
-            buttons = self.units[self.selected.index()].get_buttons();
-        } */
+        } else if self.selected.is_unit() {
+            buttons = Some(self.units[self.selected.index()].get_buttons());
+        } 
 
         return buttons; 
     }
@@ -264,10 +260,10 @@ impl<'p> Player<'p> {
     } 
     
 
-    pub fn render_ui<'f>(&'f self, canvas: &'f mut WindowCanvas) {
+    pub fn render_ui<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
         let mut i: usize = 0;
         while i < self.bottom_right_ui.len() {
-            self.bottom_right_ui[i].render(canvas);
+            self.bottom_right_ui[i].render(canvas, atlas);
             i += 1;
         }
         
@@ -275,7 +271,7 @@ impl<'p> Player<'p> {
             i = 0;
             while i < self.construction_buttons.len() {
                 if self.construction_buttons[i].is_some() {
-                    self.construction_buttons[i].unwrap().render(canvas);
+                    self.construction_buttons[i].unwrap().render(canvas, atlas);
                 }
                 i += 1;
             }
@@ -284,7 +280,7 @@ impl<'p> Player<'p> {
             i = 0;
             while i < buttons.len() {
                 if buttons[i].is_some() {
-                    buttons[i].unwrap().render(canvas);
+                    buttons[i].unwrap().render(canvas, atlas);
                 }
                 i += 1;
             }

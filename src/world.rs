@@ -1,48 +1,43 @@
-use sdl2::render::{Texture, WindowCanvas};
+use sdl2::render::WindowCanvas;
 use sdl2::rect::{Rect, Point};
-use rand::prelude::Distribution;
-use rand::distributions::Uniform;
 
-use super::sprite::Sprite;
-use super::general::Collidable;
+use crate::sprite::{TextureType, TextureManager};
+use crate::sprite::Sprite;
+use crate::general::Collidable;
 
 //Represents current world or map, also used as camera boundary
-pub struct World<'w> {
-    pub world_textures: Vec<&'w Texture<'w>>,
-    pub world_sprites: Vec<Vec<Sprite<'w>>>,
+pub struct World {
+    pub world_sprites: Vec<Vec<Sprite>>,
     pub world_encode: Vec<Vec<i32>>,
-    pub grid_texture: &'w Texture<'w>,
-    pub grid: Vec<Vec<Cell<'w>>>,
+    pub grid: Vec<Vec<Cell>>,
 }
 
-impl<'w> World<'w> {
-    pub fn new(world_textures: Vec<&'w Texture>, world_encode: Vec<Vec<i32>>,
-            grid_texture: &'w Texture<'w>) -> World<'w> {
+impl World {
+    pub fn new<'f>(world_encode: Vec<Vec<i32>>, atlas: &'f TextureManager) -> World {
         let mut new_world = World{
-            world_textures,
-            grid_texture,
             world_encode,
             grid: {
-                let new_grid: Vec<Vec<Cell>> = vec![vec![]];
+                let mut new_grid: Vec<Vec<Cell>> = vec![vec![]];
+                new_grid.pop();
                 new_grid
             },
             world_sprites: {
-                let new_sprites: Vec<Vec<Sprite>> = vec![vec![]];
+                let mut new_sprites: Vec<Vec<Sprite>> = vec![vec![]];
+                new_sprites.pop();
                 new_sprites
-            }
+            },
         };
-        new_world.load_sprites();
+        new_world.load_sprites(atlas);
     
         {
-            new_world.grid.pop();
             let mut i: usize = 0;
             while i < (new_world.world_sprites.len() * 2) {
                 let mut j: usize = 0;
                 let mut grid_row: Vec<Cell> = vec![];
                 while j < (new_world.world_sprites[i/2].len() * 2) {
-                    grid_row.push(Cell::new(
-                        Point::new(i as i32 * 25, j as i32 * 25),
-                        grid_texture));
+                    grid_row.push(Cell::new(Point::new(i as i32 * 25, j as i32 * 25),
+                        TextureType::World { tile_index: 0 },
+                        atlas));
                     j += 1;
                 }
                 
@@ -54,50 +49,37 @@ impl<'w> World<'w> {
         return new_world;
     }
 
-    pub fn load_sprites(&mut self) {
-        self.world_sprites.pop();
+    pub fn load_sprites<'f>(&'f mut self, atlas: &'f TextureManager) {
         let mut i: usize = 0;
-        let mut rng = rand::thread_rng();
-        let die = Uniform::from(0..3);
         while i < self.world_encode.len() {
             let mut j: usize = 0;
             let mut temp_sprites: Vec<Sprite> = vec![];
             while j < self.world_encode[i].len() {
-                let number = die.sample(&mut rng);
                 temp_sprites.push(Sprite::new(
-                    self.world_textures[self.world_encode[i][j] as usize],
-                    Rect::new(number as i32 * 64, 0, 64, 64),
-                    Point::new(i as i32 * 50, j as i32 * 50), 50, 50));
+                    Rect::new(i as i32 * 50, j as i32 * 50, 50, 50),
+                    TextureType::World { tile_index: self.world_encode[i][j] as usize },
+                    atlas));
                 j += 1;
             }
             
             self.world_sprites.push(temp_sprites);
             i += 1;
         }
-        
-        {
-            let mut i: usize = 0;
-            while i < self.world_sprites.len() {
-                let mut j: usize = 0;
-                while j < self.world_sprites[i].len() {
-                    self.world_sprites[i][j].rect.offset(100, 100);
-                    j += 1;
-                }
-                i += 1;
-            }
-        }
     }
 
-    pub fn render(&self, canvas: &mut WindowCanvas, mut viewport: Rect, show_grid: bool) {
+    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, mut viewport: Rect,
+            show_grid: bool, atlas: &'f TextureManager) {
         let mut i: usize = 0;
         viewport.set_width(viewport.width() + 100);
         viewport.set_height(viewport.height() + 100);
+        viewport.set_x(viewport.x - 100);
+        viewport.set_y(viewport.y - 100);
 
         while i < self.world_sprites.len() {
             let mut j: usize = 0;
             while j < self.world_sprites[i].len() {
-                if viewport.contains_rect(self.world_sprites[i][j].rect) {
-                    self.world_sprites[i][j].render(canvas);
+                if viewport.contains_rect(self.world_sprites[i][j].loc_rect) { 
+                    self.world_sprites[i][j].render(atlas, canvas);
                 }
                 j += 1;
             }
@@ -105,15 +87,12 @@ impl<'w> World<'w> {
         }
 
         if show_grid {
-            viewport.set_x(viewport.x - 100);
-            viewport.set_y(viewport.y - 100);
-
             i = 0;
             while i < self.grid.len() {
                 let mut j: usize = 0;
                 while j < self.grid[i].len() {
-                    if viewport.contains_rect(self.grid[i][j].sprite.rect) {
-                        self.grid[i][j].render(canvas);
+                    if viewport.contains_rect(self.grid[i][j].sprite.loc_rect) {
+                        self.grid[i][j].render(canvas, atlas);
                     }
                     j += 1;
                 }
@@ -124,16 +103,16 @@ impl<'w> World<'w> {
 }
 
 #[derive(Clone, Copy)]
-pub struct Cell<'c> {
-    pub sprite: Sprite<'c>,
+pub struct Cell {
+    pub sprite: Sprite,
     pub occupied: bool,
     pub highlighted: bool,
 }
 
-impl<'c> Cell<'c> {
-    pub fn new<'f>(location: Point, texture: &'c Texture<'c>) -> Cell<'c> {
+impl Cell {
+    pub fn new<'f>(location: Point, t_type: TextureType, atlas: &'f TextureManager) -> Cell {
         Cell {
-            sprite: Sprite::new(texture, Rect::new(0, 0, 64, 64), location, 25, 25),
+            sprite: Sprite::new(Rect::new(location.x, location.y, 25, 25), t_type, atlas),
             occupied: false,
             highlighted: false,
         }
@@ -141,15 +120,15 @@ impl<'c> Cell<'c> {
 
     pub fn occupy<'f>(&'f mut self) {
         self.occupied = true;
-        self.sprite.texture_location.x = 64;
+        self.sprite.texture_rect.x = 64;
     }
 
     pub fn deoccupy<'f>(&'f mut self) {
         self.occupied = false;
         if self.highlighted {
-            self.sprite.texture_location.x = 128;
+            self.sprite.texture_rect.x = 128;
         } else {
-            self.sprite.texture_location.x = 0;
+            self.sprite.texture_rect.x = 0;
         }
 
     }
@@ -157,51 +136,42 @@ impl<'c> Cell<'c> {
     pub fn highlight<'f>(&'f mut self) {
         self.highlighted = true;
         if !self.occupied {
-            self.sprite.texture_location.x = 128;
+            self.sprite.texture_rect.x = 128;
         }
     }
 
     pub fn dehighlight<'f>(&'f mut self) {
         self.highlighted = false;
         if !self.occupied {
-            self.sprite.texture_location.x = 0;
+            self.sprite.texture_rect.x = 0;
         }
     }
 
-    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas) {
-        self.sprite.render(canvas);
+    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
+        self.sprite.render(atlas, canvas);
     }
 }
 
-pub struct WorldObject<'o> {
-    sprite: Sprite<'o>,
+#[allow(dead_code)]
+pub struct WorldObject {
+    sprite: Sprite,
     collider: Rect,
     collider_type: Collidable,
 }
 
-impl<'o> WorldObject<'o> {
-    pub fn new(texture_source: &'o Texture, collider: Rect, collider_type: Collidable,
-            initial_location: Point) -> WorldObject<'o> {
-        let new_object = WorldObject {
-            sprite: {
-                Sprite { 
-                    texture_source, 
-                    location: initial_location, 
-                    texture_location: Rect::new(0, 0, 64, 64),
-                    width: 50, 
-                    height: 50,
-                    rect: Rect::new(initial_location.x, initial_location.y, 50, 50)
-                }
-            },
+#[allow(dead_code)]
+impl WorldObject {
+    pub fn new<'f>(t_type: TextureType, collider: Rect, collider_type: Collidable, 
+            atlas: &'f TextureManager) -> WorldObject {
+        WorldObject {
+            sprite: Sprite::new(collider, t_type, atlas), 
             collider,
             collider_type,
-        };
-
-        return new_object;
+        }
     }
 
-    pub fn render(&self, canvas: &mut WindowCanvas) {
-        self.sprite.render(canvas);
+    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
+        self.sprite.render(atlas, canvas);
     }
 }
 

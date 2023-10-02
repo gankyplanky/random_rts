@@ -1,55 +1,53 @@
 use sdl2::render::WindowCanvas;
 use sdl2::rect::Rect;
 
-use super::{Sprite, Collidable, Building};
+use crate::{Sprite, Collidable, sprite::TextureManager};
 
 #[derive(Clone, Copy)]
-pub struct UiElement<'u> {
-    pub sprite: Sprite<'u>,
+pub struct UiElement {
+    pub sprite: Sprite,
     pub collider_type: Collidable,
     pub collider: Rect,
 }
 
-impl<'p> UiElement<'p> {
-    pub fn new(sprite: Sprite<'p>) -> UiElement<'p> {
-        let temp = sprite.clone();
-        let collider = Rect::new(temp.location.x, temp.location.y, temp.width, temp.height);
-        let new_ui = UiElement {
+impl UiElement {
+    pub fn new<'f>(mut sprite: Sprite, texture_rect_order: i32) -> UiElement {
+        
+        let collider = sprite.loc_rect.to_owned();
+        sprite.texture_rect.x = texture_rect_order * 64;
+
+        UiElement {
             collider_type: Collidable::UI,
             sprite,
             collider 
-        };
-
-        return new_ui;
+        }
     }
 
-    pub fn render(&self, canvas: &mut WindowCanvas) {
-        self.sprite.render(canvas);
+    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
+        self.sprite.render(atlas, canvas);
     }
 }
 
 #[derive(Clone, Copy)]
-pub struct Button<'b> {
-    pub ui: UiElement<'b>,
+pub struct Button {
+    pub ui: UiElement,
     pub btn_function: ButtonFunction, 
 }
 
-impl<'b> Button<'b> {
-    pub fn new(ui_elem: UiElement<'b>, btn_function: ButtonFunction) -> Button<'b> {
-        let new_button = Button {
+impl Button {
+    pub fn new<'f>(ui_elem: UiElement, btn_function: ButtonFunction) -> Button {
+        Button {
             ui: ui_elem,
             btn_function
-        };
-
-        return new_button;
+        }
     }
 
-    pub fn render(&self, canvas: &mut WindowCanvas) {
-        self.ui.render(canvas);
+    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
+        self.ui.render(canvas, atlas);
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ButtonFunction {
     ShowTier1Buildings,
     ShowTier2Buildings,
@@ -60,4 +58,22 @@ pub enum ButtonFunction {
     PlaceConstruction,
     PlaceBarracks,
     PlaceCommandCentre,
+}
+
+#[allow(unreachable_patterns)]
+impl ButtonFunction {
+    pub fn get_texture_index<'f>(&'f self) -> i32 {
+        match self {
+            ButtonFunction::ShowTier1Buildings => { 0 },
+            ButtonFunction::ShowTier2Buildings => { 1 },
+            ButtonFunction::MakeWorker => { 5 },
+            ButtonFunction::Back => { 2 },
+            ButtonFunction::MakeBarracks => { 4 },
+            ButtonFunction::MakeCC => { 3 },
+            ButtonFunction::PlaceBarracks => { 4 },
+            ButtonFunction::PlaceCommandCentre => { 3 },
+            ButtonFunction::PlaceConstruction => { 6 },
+            _ => { unimplemented!() }
+        }
+    }
 }

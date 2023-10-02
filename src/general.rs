@@ -1,19 +1,12 @@
 use crate::ui::{ButtonFunction, Button, UiElement};
-use crate::sprite::Sprite;
-use sdl2::rect::{Rect, Point};
-use sdl2::render::Texture;
+use crate::sprite::{Sprite, TextureManager, TextureType};
+use sdl2::rect::Rect;
+use strum_macros::Display;
 
 pub const CCBUILD_TIME: u64 = 1000;
 pub const BARRACKS_BUILD_TIME: u64 = 1000;
-pub const SHOW_TIER1_BUILDINGS_INDEX: i32 = 0;
-pub const SHOW_TIER2_BUILDINGS_INDEX: i32 = 1;
-pub const PLACE_CONSTRUCTIN_INDEX: i32 = 6;
-pub const BARRACKS_INDEX: i32 = 4;
-pub const COMMAND_CENTRE_INDEX: i32 = 3;
-pub const WORKER_INDEX: i32 = 5;
-pub const BACK_INDEX: i32 = 2;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Collidable {
     GroundCollidable,
     GroundUncollidable,
@@ -24,22 +17,31 @@ pub enum Collidable {
     UI,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Display)]
 pub enum Faction {
     PlaceholderFaction1,
 }
 
-pub fn gen_button<'f>(button_texture: &'f Texture<'f>, texture_index: i32, order: usize, 
-        bottom_right_ui: Vec<UiElement<'f>>, button_function: ButtonFunction) -> Option<Button<'f>> {
-    Some(Button::new(UiElement::new(
-        Sprite::new(button_texture, Rect::new(
-                texture_index * 64, 0, 64, 64), 
-                Point::new(bottom_right_ui[order + 1].sprite.location.x, 
-                    bottom_right_ui[order + 1].sprite.location.y),
-            50, 50)
-        ),
-        button_function
-    ))
+pub fn gen_button<'f>(atlas: &'f TextureManager, bottom_right_ui: Vec<UiElement>,
+        btn_function: ButtonFunction, order: usize) -> Option<Button> {
+    
+    Some(Button::new(UiElement::new(Sprite::new(
+        Rect::new(
+            bottom_right_ui[order + 1].collider.x,
+            bottom_right_ui[order + 1].collider.y,
+            50, 50),
+        TextureType::UI { type_index: 0 }, atlas),
+        btn_function.get_texture_index()), btn_function))
+}
+
+pub fn string_contains_any<'f>(str: String, options: Vec<String>) -> bool {
+    for option in options {
+        if str.contains(option.as_str()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
