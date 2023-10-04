@@ -3,7 +3,7 @@ use sdl2::rect::{Rect, Point};
 
 use crate::sprite::{TextureType, TextureManager};
 use crate::sprite::Sprite;
-use crate::general::Collidable;
+use crate::general::{Collidable, Renderable};
 
 //Represents current world or map, also used as camera boundary
 pub struct World {
@@ -68,35 +68,29 @@ impl World {
     }
 
     pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, mut viewport: Rect,
-            show_grid: bool, atlas: &'f TextureManager) {
-        let mut i: usize = 0;
+            show_grid: bool, tx_mgr: &'f TextureManager) {
+        
         viewport.set_width(viewport.width() + 100);
         viewport.set_height(viewport.height() + 100);
         viewport.set_x(viewport.x - 100);
         viewport.set_y(viewport.y - 100);
 
-        while i < self.world_sprites.len() {
-            let mut j: usize = 0;
-            while j < self.world_sprites[i].len() {
-                if viewport.contains_rect(self.world_sprites[i][j].loc_rect) { 
-                    self.world_sprites[i][j].render(atlas, canvas);
+        for row in self.world_sprites.iter() {
+            for tile in row.iter() {
+                if viewport.contains_rect(tile.loc_rect) {
+                    tile.render(tx_mgr, canvas);
                 }
-                j += 1;
             }
-            i += 1;
         }
 
         if show_grid {
-            i = 0;
-            while i < self.grid.len() {
-                let mut j: usize = 0;
-                while j < self.grid[i].len() {
-                    if viewport.contains_rect(self.grid[i][j].sprite.loc_rect) {
-                        self.grid[i][j].render(canvas, atlas);
+               
+            for row in self.grid.iter() {
+                for cell in row.iter() {
+                    if viewport.contains_rect(cell.sprite.loc_rect) {
+                        cell.render(tx_mgr, canvas);
                     }
-                    j += 1;
                 }
-                i += 1;
             }
         }
     }
@@ -123,7 +117,7 @@ impl Cell {
         self.sprite.texture_rect.x = 64;
     }
 
-    pub fn deoccupy<'f>(&'f mut self) {
+    pub fn _deoccupy<'f>(&'f mut self) {
         self.occupied = false;
         if self.highlighted {
             self.sprite.texture_rect.x = 128;
@@ -146,9 +140,15 @@ impl Cell {
             self.sprite.texture_rect.x = 0;
         }
     }
+}
 
-    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
-        self.sprite.render(atlas, canvas);
+impl Renderable for Cell {
+    fn render<'f>(&'f self, tx_mgr: &'f TextureManager, canvas: &'f mut WindowCanvas) {
+        self.sprite.render(tx_mgr, canvas);
+    }
+
+    fn get_loc_rect<'f>(&'f self) -> Rect {
+        self.sprite.get_loc_rect()
     }
 }
 
@@ -169,9 +169,14 @@ impl WorldObject {
             collider_type,
         }
     }
-
-    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
-        self.sprite.render(atlas, canvas);
-    }
 }
 
+impl Renderable for WorldObject {
+    fn render<'f>(&'f self, tx_mgr: &'f TextureManager, canvas: &'f mut WindowCanvas) {
+        self.sprite.render(tx_mgr, canvas);
+    }
+
+    fn get_loc_rect<'f>(&'f self) -> Rect {
+        self.collider
+    }
+}

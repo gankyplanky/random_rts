@@ -1,11 +1,13 @@
 use crate::ui::{ButtonFunction, Button, UiElement};
 use crate::sprite::{Sprite, TextureManager, TextureType};
 use sdl2::rect::Rect;
+use sdl2::render::WindowCanvas;
 use strum_macros::Display;
 
 pub const CCBUILD_TIME: u64 = 1000;
 pub const BARRACKS_BUILD_TIME: u64 = 1000;
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Collidable {
     GroundCollidable,
@@ -34,6 +36,7 @@ pub fn gen_button<'f>(atlas: &'f TextureManager, bottom_right_ui: Vec<UiElement>
         btn_function.get_texture_index()), btn_function))
 }
 
+#[allow(dead_code)]
 pub fn string_contains_any<'f>(str: String, options: Vec<String>) -> bool {
     for option in options {
         if str.contains(option.as_str()) {
@@ -44,6 +47,7 @@ pub fn string_contains_any<'f>(str: String, options: Vec<String>) -> bool {
     return false;
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Selection {
     Building(usize),
@@ -78,6 +82,7 @@ impl Selection {
         }
     }
     
+    #[allow(dead_code)]
     pub fn is_type<'f>(&'f self, selection_type: Selection) -> bool {
         self.to_owned() == selection_type
     }
@@ -94,6 +99,21 @@ impl Selection {
                 panic!("Selection can't return index of None");
             }
         }
+    }
+}
+
+pub trait Renderable {
+    fn render<'f>(&'f self, tx_mgr: &'f TextureManager, canvas: &'f mut WindowCanvas);
+    
+    #[allow(unused_variables)]
+    fn render_with_custom<'f>(&'f self, tx_mgr: &'f TextureManager,
+        canvas: &'f mut WindowCanvas, loc: Option<Rect>, t_loc: Option<Rect>) {
+
+        self.render(tx_mgr, canvas);
+    }
+
+    fn get_loc_rect<'f>(&'f self) -> Rect {
+        unimplemented!()
     }
 }
 

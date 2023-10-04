@@ -14,7 +14,7 @@ use std::collections::hash_map::HashMap;
 use std::cmp::max;
 
 use crate::building::BuildingType;
-use crate::general::Faction;
+use crate::general::{Faction, Renderable};
 
 const TEXTURE_BUILDING_WIDTH: u32 = 128;
 const TEXTURE_BUILDING_HEIGHT: u32 = 128;
@@ -48,10 +48,44 @@ impl Sprite {
         self.loc_rect.x = new_location.x;
         self.loc_rect.y = new_location.y;
     }
+}
 
-    pub fn render<'f>(&'f self, atlas: &'f TextureManager, canvas: &'f mut WindowCanvas) {
-        canvas.copy(atlas.get_atlas_ref(), self.texture_rect, self.loc_rect)
-            .expect("Failed to render texture");
+impl Renderable for Sprite {
+    fn render<'f>(&'f self, tx_mgr: &'f TextureManager, canvas: &'f mut WindowCanvas) {
+        let res = canvas.copy(tx_mgr.get_atlas_ref(), self.texture_rect, self.loc_rect);
+
+        if res.is_err() {
+            panic!("Failed to render [{}]", self.t_type.full_display());
+        }
+    }
+
+    fn render_with_custom<'f>(&'f self, tx_mgr: &'f TextureManager,
+            canvas: &'f mut WindowCanvas, loc: Option<Rect>, t_loc: Option<Rect>) {
+        
+        let loc_rect: Rect;
+        let t_rect: Rect;
+
+        if loc.is_some() {
+            loc_rect = loc.unwrap();
+        } else {
+            loc_rect = self.loc_rect;
+        }
+
+        if t_loc.is_some() {
+            t_rect = t_loc.unwrap();
+        } else {
+            t_rect = self.texture_rect;
+        }
+
+        let res = canvas.copy(tx_mgr.get_atlas_ref(), t_rect, loc_rect);
+
+        if res.is_err() {
+            panic!("Failed to render [{}]", self.t_type.full_display());
+        }
+    }
+
+    fn get_loc_rect<'f>(&'f self) -> Rect {
+        self.loc_rect
     }
 }
 
@@ -61,6 +95,33 @@ pub enum TextureType {
     World {tile_index: usize},
     UI {type_index: usize},
     Filler
+}
+
+impl TextureType {
+    pub fn full_display<'f>(&'f self) -> String {
+        let mut string = self.to_string();
+
+        match self {
+            TextureType::Building { faction, b_type } => {
+                string.push_str(format!(": fc-{} b_type-{}", 
+                    faction, b_type).as_str());
+                string
+            },
+            TextureType::UI { type_index } => {
+                string.push_str(format!(": t_index-{}", 
+                    type_index).as_str());
+                string
+            },
+            TextureType::World { tile_index } => {
+                string.push_str(format!(": tile_index-{}", 
+                    tile_index).as_str());
+                string
+            },
+            TextureType::Filler => {
+                string
+            },
+        }
+    }
 }
 
 pub struct TextureManager<'t> {

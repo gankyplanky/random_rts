@@ -18,17 +18,18 @@ use sdl2::rect::{Point, Rect};
 use sdl2::render::Texture;
 use sdl2::mouse::MouseButton;
 
+#[allow(unused_imports)]
 use stopwatch::Stopwatch;
 
 use std::time::Duration;
 
-use sprite::{Sprite, TextureManager};
-use camera::Camera;
-use world::{World, WorldObject};
-use general::{Collidable, Faction, Selection};
-use building::{Building, BuildingType};
-use unit::Unit;
-use player::Player;
+use sprite::*;
+use camera::*;
+use world::*;
+use general::*;
+use building::*;
+use unit::*;
+use player::*;
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -48,13 +49,14 @@ fn main() {
     let texture_loader = canvas.texture_creator();
     
     //Load texture atlas and create player cam
-    let mut atlas = TextureManager::new(&texture_loader);
-    atlas.update(&mut canvas);
+    let mut tx_mgr = TextureManager::new(&texture_loader);
+    tx_mgr.update(&mut canvas);
 
     let mut player_cam = Camera::new(canvas.viewport(), Keycode::Up, Keycode::Down,
         Keycode::Left, Keycode::Right, 15);
 
     //Rendering vectors
+    #[allow(unused_mut)]
     let mut objects: Vec<WorldObject> = vec![];
     let mut players: Vec<Player> = vec![];
 
@@ -87,7 +89,7 @@ fn main() {
 
             new_encode
         },
-        &atlas
+        &tx_mgr
     );
       
     let mut buffer: Texture = texture_loader.create_texture_target(
@@ -103,25 +105,25 @@ fn main() {
     canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
     canvas.set_draw_color(Color::RGBA(0, 0, 0, 0));
 
-    players.push(Player::new(Faction::PlaceholderFaction1, player_cam.viewport, &atlas));
+    players.push(Player::new(Faction::PlaceholderFaction1, player_cam.viewport, &tx_mgr));
     
     {
         let temp = players[0].to_owned();
 
         players[0].buildings.push(Building::new(Point::new(50, 50), BuildingType::CommandCentre,
-            Faction::PlaceholderFaction1, 0, temp.bottom_right_ui.to_owned(), &atlas));
+            Faction::PlaceholderFaction1, 0, temp.bottom_right_ui.to_owned(), &tx_mgr));
         
         players[0].selected = Selection::Building(0);
         players[0].place_building(&mut game_map);
     }
 
-    //let mut avg: f64 = 0f64;
-    //let mut count: f64 = 0f64;
+    let mut avg: f64 = 0f64;
+    let mut count: f64 = 0f64;
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     'main: loop {
-        //let mut temp_timer = Stopwatch::new();
-        //temp_timer.start();
+        let mut temp_timer = Stopwatch::new();
+        temp_timer.start();
         canvas.clear();
 
         player_cam.viewport.set_width(canvas.window().size().0);
@@ -152,7 +154,7 @@ fn main() {
                         players[0].buildings[index].highlight_cells(&mut game_map);
                     }
                 }
-                Event::MouseButtonDown { mouse_btn, x, y, .. } => {
+                Event::MouseButtonDown { /*mouse_btn, x, y,*/ .. } => {
 
                 }
                 Event::MouseButtonUp { mouse_btn, x, y, .. } => {
@@ -198,7 +200,7 @@ fn main() {
             while i < players[0].buildings.len() {
                 if players[0].buildings[i].constructing.is_some() {
                     if players[0].buildings[i].construction_done() {
-                        let temp_building = players[0].buildings[i].get_constructed(&atlas)
+                        let temp_building = players[0].buildings[i].get_constructed(&tx_mgr)
                             .to_owned();
                         players[0].buildings.push(temp_building.unwrap().to_owned());
                         players[0].buildings[i].constructing = None;
@@ -221,29 +223,17 @@ fn main() {
                     game_map.world_sprites[0].len() as u32 *
                         game_map.world_sprites[0][0].loc_rect.h as u32 + 50));
                 game_map.render(texture_canvas, player_cam.viewport,
-                    players[0].placing_building, &atlas);
+                    players[0].placing_building, &tx_mgr);
                 
                 //World objects (decorations, obsticles, cliffs and similar)
-                {
-                    let mut i: usize = 0;
-                    while i < objects.len() {
-                        objects[i].render(texture_canvas, &atlas);
-                        i += 1;
-                    }
+                for object in objects.iter() {
+                    object.render(&tx_mgr, texture_canvas);
                 }
-                //Buildings/Units (all player or AI made buildings and units)
-                {
-                    for player in temp_players {
-                        for mut building in player.buildings {
-                            building.render(texture_canvas, &atlas);
-                        }
 
-                        /*for unit in player.units {
-                            unit.render(texture_canvas);
-                        }*/
-                        
-                    }
-                } 
+                //Buildings/Units (all player or AI made buildings and units)
+                for player in temp_players.iter() {
+                    player.render_owned(&tx_mgr, texture_canvas);
+                }
             });
 
             //Copy vieport from buffer
@@ -252,17 +242,17 @@ fn main() {
         }
 
         //UI
-        players[0].render_ui(&mut canvas, &atlas);
+        players[0].render_ui(&tx_mgr, &mut canvas);
 
         canvas.present();
         
-        //println!("{} ms", temp_timer.elapsed().as_nanos() as f64 / 1_000_000f64);
-        //avg += temp_timer.elapsed().as_nanos() as f64 / 1_000_000f64;
-        //count += 1f64;
-        //temp_timer.stop();
-        //temp_timer.reset();
+        avg += temp_timer.elapsed().as_nanos() as f64 / 1_000_000f64;
+        count += 1f64;
+        temp_timer.stop();
+        temp_timer.reset();
+        
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 72));
     }
 
-    //println!("avg: {} ms", avg / count);
+    println!("avg: {} ms", avg / count);
 }

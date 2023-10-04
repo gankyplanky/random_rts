@@ -2,6 +2,7 @@ use sdl2::render::WindowCanvas;
 use sdl2::rect::Rect;
 
 use crate::{Sprite, Collidable, sprite::TextureManager};
+use crate::general::Renderable;
 
 #[derive(Clone, Copy)]
 pub struct UiElement {
@@ -22,9 +23,15 @@ impl UiElement {
             collider 
         }
     }
+}
 
-    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
-        self.sprite.render(atlas, canvas);
+impl Renderable for UiElement {
+    fn render<'f>(&'f self, tx_mgr: &'f TextureManager, canvas: &'f mut WindowCanvas) {
+        self.sprite.render(tx_mgr, canvas);
+    }
+
+    fn get_loc_rect<'f>(&'f self) -> Rect {
+        self.sprite.get_loc_rect()
     }
 }
 
@@ -41,12 +48,19 @@ impl Button {
             btn_function
         }
     }
+}
 
-    pub fn render<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
-        self.ui.render(canvas, atlas);
+impl Renderable for Button {
+    fn render<'f>(&'f self, tx_mgr: &'f TextureManager, canvas: &'f mut WindowCanvas) {
+        self.ui.render(tx_mgr, canvas);
+    }
+
+    fn get_loc_rect<'f>(&'f self) -> Rect {
+        self.ui.get_loc_rect()
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ButtonFunction {
     ShowTier1Buildings,

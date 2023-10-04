@@ -2,13 +2,12 @@ use sdl2::render::WindowCanvas;
 use sdl2::rect::{Point, Rect};
 
 use crate::building::{BuildingType, BuildingStatus};
-use crate::general::Selectable;
+use crate::general::{Selectable, Renderable};
 use crate::sprite::{TextureManager, TextureType};
 use crate::ui::ButtonFunction;
 use crate::world::World;
-
-use super::{Sprite, Building, Faction, Unit, ui::{UiElement, Button}};
-use super::general::{self, Selection};
+use crate::{Sprite, Building, Faction, Unit, ui::{UiElement, Button}};
+use crate::general::{self, Selection};
 
 #[derive(Clone)]
 pub struct Player {
@@ -148,15 +147,12 @@ impl Player {
     }
     
     pub fn check_place_construction_flag<'f>(&'f self) -> bool {
-        let mut i: usize = 0;
-        while i < self.buildings.len() {
-            if self.buildings[i].place_construction_flag {
+        for building in self.buildings.iter() {
+            if building.place_construction_flag {
                 return true;
             }
-
-            i += 1;
         }
-        return false;
+        false
     }
     
     //General
@@ -258,31 +254,34 @@ impl Player {
 
         return false;
     } 
-    
 
-    pub fn render_ui<'f>(&'f self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
-        let mut i: usize = 0;
-        while i < self.bottom_right_ui.len() {
-            self.bottom_right_ui[i].render(canvas, atlas);
-            i += 1;
-        }
-        
+    pub fn render_owned<'f>(&'f self, tx_mgr: &'f TextureManager, canvas: &'f mut WindowCanvas) {
+        self.buildings.iter().for_each(|b| {
+            b.render(tx_mgr, canvas);
+        });
+
+        self.units.iter().for_each(|u| {
+            u.render(tx_mgr, canvas);
+        });
+    }
+
+    pub fn render_ui<'f>(&'f self, tx_mgr: &'f TextureManager, canvas: &'f mut WindowCanvas) {
+        self.bottom_right_ui.iter().for_each(|ui| {
+            ui.render(tx_mgr, canvas);
+        });
+
         if self.check_place_construction_flag() {
-            i = 0;
-            while i < self.construction_buttons.len() {
-                if self.construction_buttons[i].is_some() {
-                    self.construction_buttons[i].unwrap().render(canvas, atlas);
+            self.construction_buttons.iter().for_each(|button| {
+                if button.is_some() {
+                    button.unwrap().render(tx_mgr, canvas);
                 }
-                i += 1;
-            }
+            });
         } else if self.selected.is_some() {
             let buttons = self.get_buttons().unwrap();
-            i = 0;
-            while i < buttons.len() {
-                if buttons[i].is_some() {
-                    buttons[i].unwrap().render(canvas, atlas);
-                }
-                i += 1;
+            for button in buttons.iter() {
+                if button.is_some() {
+                    button.unwrap().render(tx_mgr, canvas);
+                } 
             }
         }
     }

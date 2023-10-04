@@ -7,7 +7,7 @@ use sdl2::render::WindowCanvas;
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, Display};
 
-use crate::general::Selectable;
+use crate::general::{Selectable, Renderable};
 use crate::sprite::{TextureType, TextureManager};
 use crate::world::{World, Cell};
 
@@ -240,20 +240,26 @@ impl Building {
         self.constructing = Some(Construction::new(building_type, self.faction,
             self.team, building_type.get_build_time(), bottom_right_ui));
     }
+}
 
-    pub fn render<'f>(&'f mut self, canvas: &'f mut WindowCanvas, atlas: &'f TextureManager) {
+impl Renderable for Building {
+    fn render<'f>(&'f self, tx_mgr: &'f TextureManager, canvas: &'f mut WindowCanvas) {
         match self.status {
             BuildingStatus::Built => {
-                self.sprite.render(atlas, canvas);
+                self.sprite.render(tx_mgr, canvas);
             },
             BuildingStatus::Placing => {
-                self.sprite.texture_rect.x += 128;
-                self.sprite.render(atlas, canvas);
-                self.sprite.texture_rect.x -= 128;
+                let mut temp_rect = self.sprite.texture_rect;
+                temp_rect.x += 128;
+                self.sprite.render_with_custom(tx_mgr, canvas, None, Some(temp_rect));
             },
             BuildingStatus::NotBuilt => {}
         }
-    } 
+    }
+
+    fn get_loc_rect<'f>(&'f self) -> Rect {
+        self.sprite.get_loc_rect()
+    }
 }
 
 impl Selectable for Building {
@@ -317,7 +323,6 @@ pub enum BuildingStatus {
     Placing,
     NotBuilt,
 }
-
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, EnumIter, Display)]
 pub enum BuildingType {
