@@ -1,8 +1,11 @@
-use crate::ui::{ButtonFunction, Button, UiElement};
+use crate::ui::{ButtonFunction, Button, UiElement, UIProperties, XAlignment, YAlignment};
 use crate::sprite::{Sprite, TextureManager, TextureType};
+
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
 use strum_macros::Display;
+
+use std::cmp::max;
 
 pub const CCBUILD_TIME: u64 = 1000;
 pub const BARRACKS_BUILD_TIME: u64 = 1000;
@@ -33,7 +36,22 @@ pub fn gen_button<'f>(atlas: &'f TextureManager, bottom_right_ui: Vec<UiElement>
             bottom_right_ui[order + 1].collider.y,
             50, 50),
         TextureType::UI { type_index: 0 }, atlas),
-        btn_function.get_texture_index()), btn_function))
+        Some(UIProperties::new(
+            (XAlignment::None, YAlignment::None), 
+            0, 
+            (0, 0, 0, 0), 
+            get_max_z(&bottom_right_ui) + 1)),
+        btn_function.get_texture_index()),
+        btn_function))
+}
+
+fn get_max_z<'f>(elems: &'f Vec<UiElement>) -> usize {
+    let mut max_z: usize = 0;
+    elems.iter()
+        .filter(|elem| 
+            elem.props.is_some())
+        .for_each(|elem| max_z = max(max_z, elem.props.unwrap().z_layer));
+    max_z
 }
 
 #[allow(dead_code)]
@@ -113,6 +131,11 @@ pub trait Renderable {
     }
 
     fn get_loc_rect<'f>(&'f self) -> Rect {
+        unimplemented!()
+    }
+    
+    #[allow(unused_variables)]
+    fn set_loc_rect<'f>(&'f mut self, new: Rect) {
         unimplemented!()
     }
 }

@@ -74,24 +74,15 @@ impl World {
         viewport.set_height(viewport.height() + 100);
         viewport.set_x(viewport.x - 100);
         viewport.set_y(viewport.y - 100);
-
-        for row in self.world_sprites.iter() {
-            for tile in row.iter() {
-                if viewport.contains_rect(tile.loc_rect) {
-                    tile.render(tx_mgr, canvas);
-                }
-            }
-        }
+        
+        self.world_sprites.iter().flatten()
+            .filter(|tile| viewport.contains_rect(tile.loc_rect))
+            .for_each(|tile| tile.render(tx_mgr, canvas));
 
         if show_grid {
-               
-            for row in self.grid.iter() {
-                for cell in row.iter() {
-                    if viewport.contains_rect(cell.sprite.loc_rect) {
-                        cell.render(tx_mgr, canvas);
-                    }
-                }
-            }
+            self.grid.iter().flatten()
+                .filter(|cell| viewport.contains_rect(cell.get_loc_rect()))
+                .for_each(|cell| cell.render(tx_mgr, canvas));
         }
     }
 }

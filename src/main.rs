@@ -31,6 +31,8 @@ use building::*;
 use unit::*;
 use player::*;
 
+use crate::ui::UIManager;
+
 fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -54,6 +56,8 @@ fn main() {
 
     let mut player_cam = Camera::new(canvas.viewport(), Keycode::Up, Keycode::Down,
         Keycode::Left, Keycode::Right, 15);
+    
+    let mut ui_mgr = UIManager::new(player_cam.viewport);
 
     //Rendering vectors
     #[allow(unused_mut)]
@@ -105,7 +109,8 @@ fn main() {
     canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
     canvas.set_draw_color(Color::RGBA(0, 0, 0, 0));
 
-    players.push(Player::new(Faction::PlaceholderFaction1, player_cam.viewport, &tx_mgr));
+    players.push(Player::new(Faction::PlaceholderFaction1, player_cam.viewport, &tx_mgr,
+        &mut ui_mgr));
     
     {
         let temp = players[0].to_owned();
@@ -119,6 +124,8 @@ fn main() {
 
     let mut avg: f64 = 0f64;
     let mut count: f64 = 0f64;
+    
+    let mut mouse_moved;
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     'main: loop {
@@ -128,6 +135,8 @@ fn main() {
 
         player_cam.viewport.set_width(canvas.window().size().0);
         player_cam.viewport.set_height(canvas.window().size().1);
+
+        mouse_moved = false;
 
         for event in event_pump.poll_iter() {
             match event {
@@ -143,15 +152,22 @@ fn main() {
                     player_cam.check_up_key(keycode.unwrap());
                 },
                 Event::MouseMotion {x, y, .. } => { // Mouse moved
-                    player_cam.mouse_panning(x, y); // Mouse map scrolling
+                    if !mouse_moved {
+                        let mouse_cam_point = Point::new(x, y);
 
-                    let mouse_cam_point = Point::new(x, y);
-                    if players[0].placing_building { // Move building ghost
-                        players[0].dehighlight(&mut game_map);
-                        let index = players[0].selected.index();
-                        players[0].buildings[index].move_building(mouse_cam_point,
-                            player_cam.viewport, &mut game_map.grid);
-                        players[0].buildings[index].highlight_cells(&mut game_map);
+                        player_cam.mouse_panning(x, y); // Mouse map scrolling
+                        
+                        if players[0].placing_building { // Move building ghost
+                            players[0].dehighlight(&mut game_map);
+                            let index = players[0].selected.index();
+                           
+                            players[0].buildings[index].move_building(mouse_cam_point,
+                                player_cam.viewport, &mut game_map.grid);
+                            
+                            players[0].buildings[index].highlight_cells(&mut game_map);
+                        }
+
+                        mouse_moved = true;
                     }
                 }
                 Event::MouseButtonDown { /*mouse_btn, x, y,*/ .. } => {
@@ -195,20 +211,9 @@ fn main() {
         //Camera Movement 
         player_cam.move_cam(&game_map);
         
-        { //Checks for completed constructions
-            let mut i: usize = 0;
-            while i < players[0].buildings.len() {
-                if players[0].buildings[i].constructing.is_some() {
-                    if players[0].buildings[i].construction_done() {
-                        let temp_building = players[0].buildings[i].get_constructed(&tx_mgr)
-                            .to_owned();
-                        players[0].buildings.push(temp_building.unwrap().to_owned());
-                        players[0].buildings[i].constructing = None;
-                    }
-                }
-                i += 1;
-            }
-        } 
+        //Checks for completed constructions
+        players.iter_mut().for_each(|player| 
+            player.check_completed_constructions(&tx_mgr));
 
         //Rendering segment (order: world -> objects -> buildings/units -> UI)
         {
@@ -222,6 +227,7 @@ fn main() {
                         game_map.world_sprites[0][0].loc_rect.w as u32 + 50,
                     game_map.world_sprites[0].len() as u32 *
                         game_map.world_sprites[0][0].loc_rect.h as u32 + 50));
+
                 game_map.render(texture_canvas, player_cam.viewport,
                     players[0].placing_building, &tx_mgr);
                 
@@ -249,8 +255,7 @@ fn main() {
         avg += temp_timer.elapsed().as_nanos() as f64 / 1_000_000f64;
         count += 1f64;
         temp_timer.stop();
-        temp_timer.reset();
-        
+
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 72));
     }
 

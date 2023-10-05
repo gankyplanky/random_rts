@@ -152,21 +152,17 @@ impl Building {
         } 
     }
     
-    pub fn construction_done<'f>(&'f mut self) -> bool {
-        let temp_con: &'f mut Construction = self.constructing.as_mut().unwrap();
-        let check = temp_con.check_timer();
-        check
-    }
-    
-    pub fn get_constructed<'f>(&'f self, atlas: &'f TextureManager) -> Option<Building> {
+    pub fn construction_done<'f>(&'f self) -> bool {
         if self.constructing.is_some() {
-            let temp_con: &'f Construction = self.constructing.as_ref().unwrap();
-            if temp_con.finished {
-                return Some(temp_con.build_building(atlas));
-            }
+            let check: bool = self.constructing.to_owned().unwrap().check_timer();
+            return check;
         }
 
-        None
+        false
+    }
+    
+    pub fn get_constructed<'f>(&'f self, tx_mgr: &'f TextureManager) -> Building {
+        return self.constructing.to_owned().unwrap().build_building(tx_mgr);
     }
 
     fn set_button_panel<'f>(&'f mut self, index: usize) {
@@ -280,7 +276,6 @@ pub struct Construction {
     pub bottom_right_ui: Vec<UiElement>,
     pub timer: Stopwatch,
     pub timer_end:  Duration,
-    pub finished: bool,
 }
 
 impl Construction {
@@ -294,7 +289,6 @@ impl Construction {
             bottom_right_ui,
             timer: Stopwatch::new(),
             timer_end,
-            finished: false,
         };
         
         new_construction.timer.start();
@@ -302,18 +296,16 @@ impl Construction {
         return new_construction;
     }
 
-    pub fn check_timer<'f>(&'f mut self) -> bool {
-        if self.timer.elapsed().as_millis() >= self.timer_end.as_millis() {
-            self.timer.stop();
-            self.finished = true;
+    pub fn check_timer<'f>(&'f self) -> bool {
+        if self.timer.elapsed() >= self.timer_end {
             return true;
         }
         return false;
     }
 
-    pub fn build_building<'f>(&'f self, atlas: &'f TextureManager) -> Building {
+    pub fn build_building<'f>(&'f self, tx_mgr: &'f TextureManager) -> Building {
         Building::new(Point::new(0, 0), self.building_type, self.faction, self.team,
-            self.bottom_right_ui.to_owned(), atlas)
+            self.bottom_right_ui.to_owned(), tx_mgr)
     }
 }
 

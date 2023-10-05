@@ -61,7 +61,7 @@ impl Renderable for Sprite {
 
     fn render_with_custom<'f>(&'f self, tx_mgr: &'f TextureManager,
             canvas: &'f mut WindowCanvas, loc: Option<Rect>, t_loc: Option<Rect>) {
-        
+
         let loc_rect: Rect;
         let t_rect: Rect;
 
@@ -86,6 +86,10 @@ impl Renderable for Sprite {
 
     fn get_loc_rect<'f>(&'f self) -> Rect {
         self.loc_rect
+    }
+
+    fn set_loc_rect<'f>(&'f mut self, new: Rect) {
+        self.loc_rect = new;
     }
 }
 

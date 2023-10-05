@@ -4,7 +4,7 @@ use sdl2::rect::{Point, Rect};
 use crate::building::{BuildingType, BuildingStatus};
 use crate::general::{Selectable, Renderable};
 use crate::sprite::{TextureManager, TextureType};
-use crate::ui::ButtonFunction;
+use crate::ui::{ButtonFunction, UIProperties, XAlignment, YAlignment, UIManager};
 use crate::world::World;
 use crate::{Sprite, Building, Faction, Unit, ui::{UiElement, Button}};
 use crate::general::{self, Selection};
@@ -22,7 +22,8 @@ pub struct Player {
 
 impl Player {
     // New Player
-    pub fn new<'f>(faction: Faction, viewport: Rect, atlas: &'f TextureManager) -> Player {
+    pub fn new<'f>(faction: Faction, viewport: Rect, tx_mgr: &'f TextureManager, 
+            ui_mgr: &'f mut UIManager) -> Player {
         let mut new_p = Player {
             buildings: vec![],
             units: vec![],
@@ -31,10 +32,18 @@ impl Player {
             construction_buttons: [None; 16],
             placing_building: false,
             bottom_right_ui: vec![UiElement::new(Sprite::new(
-                Rect::new(viewport.w - 280, viewport.h - 280, 280, 280),
+                Rect::new(0, 0, 280, 280),
                 TextureType::UI { type_index: 1 }, 
-                atlas), 0)], // Bottom right UI container
+                tx_mgr), 
+                Some(UIProperties::new(
+                    (XAlignment::Right, YAlignment::Bottom), 
+                    0,
+                    (0, 0, 0, 0),
+                    0)),
+                0)], // Bottom right UI container
         };
+        
+        ui_mgr.organize_simple(viewport, &mut new_p.bottom_right_ui);
         
         { // Bottom right button panels
             let mut i: i32 = 0;
@@ -48,7 +57,12 @@ impl Player {
                                 new_p.bottom_right_ui[0].collider.y + i * 60 + 30,
                                 50, 50), 
                             TextureType::UI { type_index: 1 }, 
-                            atlas ),
+                            tx_mgr ),
+                            Some(UIProperties::new(
+                                (XAlignment::Centre, YAlignment::Centre), 
+                                0,
+                                (0, 0, 0, 0),
+                                1)),
                         1));
                     j += 1;
                 }
@@ -56,18 +70,28 @@ impl Player {
             }
         }
 
-        new_p.construction_buttons[0] = general::gen_button(atlas,
+        new_p.construction_buttons[0] = general::gen_button(tx_mgr,
             new_p.bottom_right_ui.to_owned(), ButtonFunction::PlaceCommandCentre, 0);
-        new_p.construction_buttons[1] = general::gen_button(atlas,
+        new_p.construction_buttons[1] = general::gen_button(tx_mgr,
             new_p.bottom_right_ui.to_owned(), ButtonFunction::PlaceBarracks, 1);
-        new_p.construction_buttons[15] = general::gen_button(atlas,
+        new_p.construction_buttons[15] = general::gen_button(tx_mgr,
             new_p.bottom_right_ui.to_owned(), ButtonFunction::Back, 15);
-        
+
         return new_p;
     }
     
     //Building Interactions
     
+    pub fn check_completed_constructions<'f>(&'f mut self, tx_mgr: &'f TextureManager) {
+        let mut completed_cons: Vec<Building> = vec![];
+
+        self.buildings.iter_mut().filter(|building| building.construction_done())
+            .for_each(|building| completed_cons.push(building.get_constructed(tx_mgr)));
+        
+        completed_cons.iter().for_each(|completed_con|
+            self.buildings.push(completed_con.to_owned()));
+    }
+
     pub fn place_building<'f>(&'f mut self, game_map: &'f mut World) {
         let index = self.selected.index();
         let cell_x = self.buildings[index].x_in_cells();
@@ -271,18 +295,15 @@ impl Player {
         });
 
         if self.check_place_construction_flag() {
-            self.construction_buttons.iter().for_each(|button| {
-                if button.is_some() {
-                    button.unwrap().render(tx_mgr, canvas);
-                }
-            });
+            self.construction_buttons.iter()
+                .filter(|btn| btn.is_some())
+                .for_each(|btn| btn.unwrap().render(tx_mgr, canvas));
+        
         } else if self.selected.is_some() {
             let buttons = self.get_buttons().unwrap();
-            for button in buttons.iter() {
-                if button.is_some() {
-                    button.unwrap().render(tx_mgr, canvas);
-                } 
-            }
+            buttons.iter()
+                .filter(|btn| btn.is_some())
+                .for_each(|btn| btn.unwrap().render(tx_mgr, canvas));
         }
     }
 }
